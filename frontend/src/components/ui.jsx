@@ -113,19 +113,23 @@ export function Field({ label, hint, error, children, full = false }) {
  * Modal dialog. Closes on Escape and on a backdrop click, and moves focus
  * inside on open so keyboard users are not left behind the overlay.
  */
-export function Modal({ title, onClose, children, footer, size = '' }) {
+export function Modal({ title, onClose, children, footer, size = '', dismissible = true }) {
   const ref = useRef(null);
-  const onCloseRef = useRef(onClose);
+  // Both are read from inside a mount-only effect, so they live in a ref rather
+  // than in the dependency array.
+  const latest = useRef({ onClose, dismissible });
 
-  // Keep the newest handler reachable from the listener below without letting
-  // it become an effect dependency.
   useEffect(() => {
-    onCloseRef.current = onClose;
+    latest.current = { onClose, dismissible };
   });
+
+  const requestClose = () => {
+    if (latest.current.dismissible) latest.current.onClose();
+  };
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key === 'Escape' && latest.current.dismissible) latest.current.onClose();
     };
     document.addEventListener('keydown', onKeyDown);
     const previouslyFocused = document.activeElement;
@@ -144,13 +148,15 @@ export function Modal({ title, onClose, children, footer, size = '' }) {
   }, []);
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && requestClose()}>
       <div className={`modal ${size ? `modal--${size}` : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={ref}>
         <header className="modal__header">
           <h2 className="modal__title flex-1">{title}</h2>
-          <button type="button" className="btn btn--ghost btn--sm" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
+          {dismissible && (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={onClose} aria-label="Close">
+              ✕
+            </button>
+          )}
         </header>
         <div className="modal__body">{children}</div>
         {footer && <footer className="modal__footer">{footer}</footer>}

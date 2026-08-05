@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { initials } from '../utils/format.js';
+import ChangePasswordModal from './ChangePasswordModal.jsx';
 
 /**
  * Application shell: sidebar navigation, header, and the routed page body.
@@ -73,6 +74,7 @@ export default function AppLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [theme, setTheme] = useTheme();
+  const [changingPassword, setChangingPassword] = useState(false);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setMenuOpen(false), [location.pathname]);
@@ -149,7 +151,15 @@ export default function AppLayout() {
               <p className="user-chip__role">{user?.role?.replace('_', ' ')}</p>
             </div>
           </div>
-          <button type="button" className="btn btn--ghost btn--block btn--sm" style={{ marginTop: 8 }} onClick={signOut}>
+          <button
+            type="button"
+            className="btn btn--ghost btn--block btn--sm"
+            style={{ marginTop: 8 }}
+            onClick={() => setChangingPassword(true)}
+          >
+            Change password
+          </button>
+          <button type="button" className="btn btn--ghost btn--block btn--sm" style={{ marginTop: 4 }} onClick={signOut}>
             Sign out
           </button>
         </div>
@@ -188,6 +198,14 @@ export default function AppLayout() {
           <Outlet context={{ settings }} />
         </main>
       </div>
+
+      {/* A flagged account is blocked until it sets its own password. This
+          overlay sits above every route, so there is no way round it. */}
+      {user?.must_change_password ? (
+        <ChangePasswordModal forced />
+      ) : (
+        changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />
+      )}
     </div>
   );
 }

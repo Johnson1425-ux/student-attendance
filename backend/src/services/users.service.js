@@ -1,6 +1,6 @@
 import { query } from '../db/pool.js';
 import { NotFoundError, BadRequestError, ConflictError, mapDatabaseError } from '../lib/errors.js';
-import { hashPassword, validatePasswordStrength, generateToken } from '../lib/password.js';
+import { hashPassword, validatePasswordStrength, generateTemporaryPassword } from '../lib/password.js';
 import { recordAudit } from './audit.service.js';
 import { logoutAllSessions } from './auth.service.js';
 
@@ -61,7 +61,7 @@ export async function getUser(id) {
  * then flagged to force a change at first sign-in.
  */
 export async function createUser(data, { actor, ip, userAgent } = {}) {
-  const generatedPassword = data.password ? null : generateToken(9);
+  const generatedPassword = data.password ? null : generateTemporaryPassword();
   const password = data.password ?? generatedPassword;
 
   const problems = validatePasswordStrength(password);
@@ -176,7 +176,7 @@ export async function setUserClasses(userId, classIds) {
 
 /** Admin-initiated reset. Returns the temporary password exactly once. */
 export async function resetUserPassword(id, { newPassword, actor, ip, userAgent } = {}) {
-  const generated = newPassword ? null : generateToken(9);
+  const generated = newPassword ? null : generateTemporaryPassword();
   const password = newPassword ?? generated;
   const problems = validatePasswordStrength(password);
   if (problems.length) throw new BadRequestError(`Password ${problems.join(', ')}`, { password: problems });

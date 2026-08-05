@@ -221,6 +221,75 @@ describe('API', () => {
       expect(res.status).toBe(403);
     });
 
+    it('issues a usable temporary password when creating an account', async () => {
+      // Regression: the generated password used to be a raw base64url token,
+      // which is not guaranteed to contain a digit, so our own policy rejected
+      // roughly one in eight before the account was even created. Creating
+      // several accounts in a row must succeed every time, and each password
+      // must actually work at the login endpoint.
+      for (let i = 0; i < 6; i += 1) {
+        const created = await request(app)
+          .post('/api/users')
+          .set(auth(adminToken))
+          .send({ email: `temp${i}@test.local`, fullName: `Temp ${i}`, role: 'teacher' });
+
+        expect(created.status).toBe(201);
+        expect(created.body.generatedPassword).toEqual(expect.any(String));
+        expect(created.body.must_change_password).toBe(true);
+
+        const signedIn = await request(app)
+          .post('/api/auth/login')
+          .send({ email: `temp${i}@test.local`, password: created.body.generatedPassword });
+
+        expect(signedIn.status).toBe(200);
+        expect(signedIn.body.user.must_change_password).toBe(true);
+      }
+    });
+
+    it('issues a usable temporary password when resetting one', async () => {
+      const teacher = await createUser({ email: 'resetme@test.local', role: 'teacher' });
+
+      const reset = await request(app)
+        .post(`/api/users/${teacher.id}/reset-password`)
+        .set(auth(adminToken))
+        .send({});
+
+      expect(reset.status).toBe(200);
+      expect(reset.body.temporaryPassword).toEqual(expect.any(String));
+
+      // The old password must stop working and the new one must start.
+      expect((await request(app).post('/api/auth/login').send({ email: 'resetme@test.local', password: 'Password123' })).status).toBe(401);
+      const signedIn = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'resetme@test.local', password: reset.body.temporaryPassword });
+      expect(signedIn.status).toBe(200);
+      expect(signedIn.body.user.must_change_password).toBe(true);
+    });
+
+    it('clears the must-change flag once the user sets their own password', async () => {
+      const created = await request(app)
+        .post('/api/users')
+        .set(auth(adminToken))
+        .send({ email: 'flagclear@test.local', fullName: 'Flag Clear', role: 'teacher' });
+
+      const first = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'flagclear@test.local', password: created.body.generatedPassword });
+      expect(first.body.user.must_change_password).toBe(true);
+
+      const changed = await request(app)
+        .post('/api/auth/change-password')
+        .set(auth(first.body.accessToken))
+        .send({ currentPassword: created.body.generatedPassword, newPassword: 'ChosenPass77' });
+      expect(changed.status).toBe(200);
+
+      const second = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'flagclear@test.local', password: 'ChosenPass77' });
+      expect(second.status).toBe(200);
+      expect(second.body.user.must_change_password).toBe(false);
+    });
+
     it('stops an admin from locking themselves out', async () => {
       const me = await request(app).get('/api/auth/me').set(auth(adminToken));
 

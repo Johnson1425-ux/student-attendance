@@ -339,9 +339,13 @@ school day.
 | `/api/users/:id/reset-password` | POST |
 | `/api/users/:id` | DELETE |
 
-Creating a user without a `password` generates one and returns it as
-`generatedPassword` — shown once, with `must_change_password` set. Deactivating
-an account immediately revokes its sessions.
+Creating a user without a `password` generates a temporary one and returns it as
+`generatedPassword` — shown once, with `must_change_password` set. Temporary
+passwords are built to satisfy the password policy by construction and avoid
+look-alike characters (`0`/`O`, `1`/`l`/`I`), since they are read off a screen
+and typed in by hand. The dashboard blocks a flagged account behind a
+non-dismissible dialog until the user sets their own password, which clears the
+flag. Deactivating an account immediately revokes its sessions.
 
 Two guards: you cannot change your own role or deactivate your own account, and
 the last active administrator cannot be demoted, deactivated or deleted.
