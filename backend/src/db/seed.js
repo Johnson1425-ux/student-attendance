@@ -15,7 +15,7 @@ import { runMigrations } from './migrate.js';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { hashPassword } from '../lib/password.js';
-import { eachDateInclusive, isoWeekday, addDays, todayInZone } from '../lib/dates.js';
+import { eachDateInclusive, isoWeekday, addDays, todayInZone, localToInstant } from '../lib/dates.js';
 import { getAttendanceConfig } from '../services/settings.service.js';
 import { rebuildDailyRecord, finalizeDay } from '../services/attendance.service.js';
 import { refreshAllAlerts } from '../services/alerts.service.js';
@@ -239,7 +239,7 @@ async function seedDemo(adminId) {
         `INSERT INTO attendance_events
            (device_id, device_serial, device_user_pin, student_id, event_time, local_date, local_time,
             punch_state, verify_mode, raw_line, dedupe_hash, applied)
-         VALUES ($1,$2,$3,$4, ($5 || ' ' || $6)::timestamptz, $5::date, $6::time, 0, 1, $7, $8, FALSE)
+         VALUES ($1,$2,$3,$4, $9, $5::date, $6::time, 0, 1, $7, $8, FALSE)
          ON CONFLICT (dedupe_hash) DO NOTHING`,
         [
           device.id,
@@ -255,6 +255,10 @@ async function seedDemo(adminId) {
             timestamp,
             punchState: 0,
           }),
+          // The generated clock time is school-local wall time, exactly as a
+          // terminal would report it, so it must be anchored to the school
+          // timezone rather than to the server's (which is UTC on Render).
+          localToInstant(date, clock, config.timezone),
         ],
       );
       touched.add(`${student.id}:${date}`);
