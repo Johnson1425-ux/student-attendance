@@ -323,6 +323,43 @@ describe('API', () => {
       expect(res.status).toBe(422);
     });
 
+    it('refuses to change a PIN that fingerprints are enrolled against', async () => {
+      const student = await createStudent({ pin: '1001', classId: klass.id });
+      const device = await createDevice({ serialNumber: 'SNPIN001' });
+      await query(
+        `INSERT INTO biometric_enrollments (student_id, device_id, finger_index) VALUES ($1, $2, 6)`,
+        [student.id, device.id],
+      );
+
+      const res = await request(app)
+        .patch(`/api/students/${student.id}`)
+        .set(auth(token))
+        .send({ deviceUserPin: '2002' });
+
+      // Silently detaching a student from their enrolled fingers would leave
+      // them scanning into nothing, so this has to be refused.
+      expect(res.status).toBe(409);
+      expect(res.body.error.message).toMatch(/fingerprint\(s\) enrolled/i);
+
+      const cleared = await request(app)
+        .patch(`/api/students/${student.id}`)
+        .set(auth(token))
+        .send({ deviceUserPin: null });
+      expect(cleared.status).toBe(409);
+    });
+
+    it('allows a PIN change when no fingerprints are enrolled yet', async () => {
+      const student = await createStudent({ pin: '1001', classId: klass.id });
+
+      const res = await request(app)
+        .patch(`/api/students/${student.id}`)
+        .set(auth(token))
+        .send({ deviceUserPin: '2002' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.device_user_pin).toBe('2002');
+    });
+
     it('moves a student to another class while keeping the history', async () => {
       const student = await createStudent({ classId: klass.id });
       const newClass = await createClass({ name: 'Form 2A' });

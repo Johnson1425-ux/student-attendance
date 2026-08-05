@@ -244,13 +244,20 @@ export async function updateStudent(id, patch, { actor, ip, userAgent } = {}) {
     throw new BadRequestError('No changes supplied');
   }
 
-  // Reassigning a PIN that biometrics are already tied to would silently
-  // detach a student from their fingerprints on the terminal.
+  // The terminal knows this student by their PIN, not by their database id.
+  // Changing or clearing the PIN while fingerprints are enrolled against the
+  // old one silently detaches them: the student keeps scanning, the device
+  // keeps accepting, and nothing lands against their record. Block it and say
+  // what to do instead.
   if (patch.deviceUserPin !== undefined && patch.deviceUserPin !== before.device_user_pin) {
-    const { rows: bio } = await query('SELECT 1 FROM biometric_enrollments WHERE student_id = $1 LIMIT 1', [id]);
-    if (bio.length > 0 && patch.deviceUserPin === null) {
+    const { rows: bio } = await query(
+      'SELECT COUNT(*)::int AS count FROM biometric_enrollments WHERE student_id = $1',
+      [id],
+    );
+    if (bio[0].count > 0) {
       throw new ConflictError(
-        'This student has fingerprints enrolled on a terminal. Remove the fingerprints from the device first.',
+        `This student has ${bio[0].count} fingerprint(s) enrolled on a terminal under PIN ${before.device_user_pin}. ` +
+          'Remove the fingerprints from the terminal first, then change the PIN and re-enrol.',
       );
     }
   }
