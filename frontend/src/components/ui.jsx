@@ -115,10 +115,17 @@ export function Field({ label, hint, error, children, full = false }) {
  */
 export function Modal({ title, onClose, children, footer, size = '' }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  // Keep the newest handler reachable from the listener below without letting
+  // it become an effect dependency.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKeyDown);
     const previouslyFocused = document.activeElement;
@@ -127,7 +134,14 @@ export function Modal({ title, onClose, children, footer, size = '' }) {
       document.removeEventListener('keydown', onKeyDown);
       previouslyFocused?.focus?.();
     };
-  }, [onClose]);
+    // Mount and unmount only. Every caller passes an inline arrow for onClose,
+    // so its identity changes on each render — and each keystroke re-renders
+    // the page holding the form state. Depending on it here re-ran this effect
+    // mid-typing: the cleanup handed focus back to the button that opened the
+    // modal, and the effect then bounced it to the first field, so only the
+    // first character of anything typed survived.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
