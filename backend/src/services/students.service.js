@@ -78,13 +78,16 @@ export async function listStudents({
   const limit = Math.min(Math.max(Number(pageSize) || 50, 1), 200);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
 
-  const orderBy =
-    {
-      name: 's.last_name, s.first_name',
-      admission: 's.admission_number',
-      newest: 's.created_at DESC',
-      class: 'c.name NULLS LAST, s.last_name',
-    }[sort] ?? 's.last_name, s.first_name';
+  // Interpolated into SQL, so the value must come from this map and nowhere
+  // else. Object.hasOwn stops a key like "constructor" resolving through the
+  // prototype chain to something that is not a sort clause at all.
+  const SORTS = {
+    name: 's.last_name, s.first_name',
+    admission: 's.admission_number',
+    newest: 's.created_at DESC',
+    class: 'c.name NULLS LAST, s.last_name',
+  };
+  const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.name;
 
   const { rows } = await query(
     `SELECT ${STUDENT_SELECT},

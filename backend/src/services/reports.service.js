@@ -102,13 +102,15 @@ export async function studentSummaryReport({
 
   // Sorting happens on the outer query, whose only table alias is `r` (the
   // roster CTE); the tally columns are available there as output aliases.
-  const orderBy = {
+  // This is interpolated into SQL, so only these exact clauses may reach it.
+  const SORTS = {
     name: 'r.last_name, r.first_name',
     rate_asc: 'attendance_rate ASC, r.last_name',
     rate_desc: 'attendance_rate DESC, r.last_name',
     absences: 'absent_days DESC, r.last_name',
     lateness: 'late_days DESC, r.last_name',
-  }[sort] ?? 'r.last_name, r.first_name';
+  };
+  const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.name;
 
   const { rows } = await query(
     `WITH school_days AS (
