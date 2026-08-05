@@ -77,10 +77,8 @@ export default function SettingsPage() {
       timezone: form.timezone,
       school_start_time: form.school_start_time,
       late_after_time: form.late_after_time,
-      school_end_time: form.school_end_time,
       school_days_of_week: form.school_days_of_week,
       consecutive_absence_threshold: Number(form.consecutive_absence_threshold),
-      duplicate_punch_window_minutes: Number(form.duplicate_punch_window_minutes),
       minimum_checkout_gap_minutes: Number(form.minimum_checkout_gap_minutes),
       auto_finalize_enabled: Boolean(form.auto_finalize_enabled),
       report_footer_note: form.report_footer_note ?? '',
@@ -140,14 +138,6 @@ export default function SettingsPage() {
               onChange={(e) => set('late_after_time', e.target.value)}
             />
           </Field>
-          <Field label="End time" hint="Used to interpret check-out scans">
-            <input
-              className="input"
-              type="time"
-              value={form.school_end_time}
-              onChange={(e) => set('school_end_time', e.target.value)}
-            />
-          </Field>
           <Field label="School days" hint="Individual dates can be overridden in the calendar" full>
             <div className="btn-group">
               {WEEKDAYS.map((day) => {
@@ -182,19 +172,6 @@ export default function SettingsPage() {
               max="60"
               value={form.consecutive_absence_threshold}
               onChange={(e) => set('consecutive_absence_threshold', e.target.value)}
-            />
-          </Field>
-          <Field
-            label="Repeat-scan window (minutes)"
-            hint="Scans this close together count as one — allows for a re-tried finger"
-          >
-            <input
-              className="input"
-              type="number"
-              min="0"
-              max="240"
-              value={form.duplicate_punch_window_minutes}
-              onChange={(e) => set('duplicate_punch_window_minutes', e.target.value)}
             />
           </Field>
           <Field

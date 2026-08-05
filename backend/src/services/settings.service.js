@@ -23,22 +23,27 @@ const DEFAULTS = {
   timezone: 'Africa/Dar_es_Salaam',
   school_start_time: '07:30',
   late_after_time: '07:45',
-  school_end_time: '15:30',
-  attendance_cutoff_time: '23:59',
   school_days_of_week: [1, 2, 3, 4, 5],
   consecutive_absence_threshold: 3,
-  duplicate_punch_window_minutes: 2,
   minimum_checkout_gap_minutes: 60,
   auto_finalize_enabled: true,
   report_footer_note: '',
 };
 
-/** All settings as a plain object, with defaults filled in for missing keys. */
+/**
+ * All settings as a plain object, with defaults filled in for missing keys.
+ *
+ * DEFAULTS is the authoritative key set: rows for keys the code no longer knows
+ * about are ignored rather than passed through, so a setting retired in one
+ * release cannot reappear in the API from a row an older client left behind.
+ */
 export async function getSettings({ force = false } = {}) {
   if (!force && cache && Date.now() < cacheExpiresAt) return cache;
   const { rows } = await query('SELECT key, value FROM settings');
   const values = { ...DEFAULTS };
-  for (const row of rows) values[row.key] = row.value;
+  for (const row of rows) {
+    if (row.key in DEFAULTS) values[row.key] = row.value;
+  }
   cache = Object.freeze(values);
   cacheExpiresAt = Date.now() + CACHE_TTL_MS;
   return cache;
@@ -54,10 +59,8 @@ export async function getAttendanceConfig() {
     lateAfterTime: padTime(s.late_after_time),
     lateAfterMinutes: minutesSinceMidnight(s.late_after_time),
     startMinutes: minutesSinceMidnight(s.school_start_time),
-    endTime: padTime(s.school_end_time),
     schoolDaysOfWeek: s.school_days_of_week,
     consecutiveAbsenceThreshold: Number(s.consecutive_absence_threshold),
-    duplicateWindowMinutes: Number(s.duplicate_punch_window_minutes),
     minimumCheckoutGapMinutes: Number(s.minimum_checkout_gap_minutes),
     autoFinalizeEnabled: Boolean(s.auto_finalize_enabled),
     reportFooterNote: s.report_footer_note,
@@ -75,25 +78,21 @@ export async function listSettings() {
 }
 
 /**
- * Validators keyed by setting. A bad timezone or an end time before the start
- * time would corrupt every subsequent attendance calculation, so these are
- * rejected at the boundary rather than defended against downstream.
+ * Validators keyed by setting. A bad timezone or an impossible bell time would
+ * corrupt every subsequent attendance calculation, so these are rejected at the
+ * boundary rather than defended against downstream.
  */
 const VALIDATORS = {
   school_name: (v) => (typeof v === 'string' && v.trim().length > 0 ? null : 'must be a non-empty name'),
   timezone: (v) => (typeof v === 'string' && isValidTimezone(v) ? null : 'must be a valid IANA timezone'),
   school_start_time: validTime,
   late_after_time: validTime,
-  school_end_time: validTime,
-  attendance_cutoff_time: validTime,
   school_days_of_week: (v) =>
     Array.isArray(v) && v.length > 0 && v.every((d) => Number.isInteger(d) && d >= 1 && d <= 7)
       ? null
       : 'must be a non-empty array of ISO weekdays (1-7)',
   consecutive_absence_threshold: (v) =>
     Number.isInteger(v) && v >= 1 && v <= 60 ? null : 'must be a whole number between 1 and 60',
-  duplicate_punch_window_minutes: (v) =>
-    Number.isInteger(v) && v >= 0 && v <= 240 ? null : 'must be a whole number between 0 and 240',
   minimum_checkout_gap_minutes: (v) =>
     Number.isInteger(v) && v >= 0 && v <= 1440 ? null : 'must be a whole number between 0 and 1440',
   auto_finalize_enabled: (v) => (typeof v === 'boolean' ? null : 'must be true or false'),
@@ -134,11 +133,6 @@ export async function updateSettings(patch, actorId) {
   if (minutesSinceMidnight(merged.late_after_time) < minutesSinceMidnight(merged.school_start_time)) {
     throw new BadRequestError('The late cut-off cannot be earlier than the school start time', {
       late_after_time: 'must be at or after school_start_time',
-    });
-  }
-  if (minutesSinceMidnight(merged.school_end_time) <= minutesSinceMidnight(merged.school_start_time)) {
-    throw new BadRequestError('The school end time must be after the start time', {
-      school_end_time: 'must be after school_start_time',
     });
   }
 

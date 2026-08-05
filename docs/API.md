@@ -317,16 +317,14 @@ Readable by any signed-in user — the frontend needs the timezone and school na
 | `timezone` | IANA string | Which day a scan belongs to |
 | `school_start_time` | `HH:mm` | Lateness is measured from here |
 | `late_after_time` | `HH:mm` | Arrivals after this are late |
-| `school_end_time` | `HH:mm` | Interpreting check-outs |
 | `school_days_of_week` | `[1..7]` | ISO weekdays; 1 = Monday |
 | `consecutive_absence_threshold` | int | School days absent before an alert |
-| `duplicate_punch_window_minutes` | int | Repeat scans treated as one |
 | `minimum_checkout_gap_minutes` | int | Before a later scan counts as leaving |
 | `auto_finalize_enabled` | bool | Whether the nightly job closes days |
 | `report_footer_note` | string | PDF footer |
 
-Cross-field rules are enforced: the late cut-off cannot precede the start of the
-day, and the end time must follow the start.
+A cross-field rule is enforced: the late cut-off cannot precede the start of the
+school day.
 
 ---
 
