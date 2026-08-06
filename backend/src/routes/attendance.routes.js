@@ -37,6 +37,8 @@ const registerQuery = z.object({
   classId: z.coerce.number().int().positive().optional(),
   status: z.enum(['present', 'late', 'absent', 'excused', 'not_marked']).optional(),
   search: z.string().trim().optional(),
+  // How the arrival was verified at the terminal, independent of status.
+  verification: z.enum(['all', 'biometric', 'non_biometric']).optional(),
 });
 
 /** The daily register — the working view for marking and correcting. */
@@ -51,6 +53,7 @@ router.get('/register', validateQuery(registerQuery), async (req, res, next) => 
         classScope: req.classScope,
         status: req.query.status ?? null,
         search: req.query.search ?? null,
+        verification: req.query.verification ?? null,
       }),
       attendanceService.getDailySummary({
         date,

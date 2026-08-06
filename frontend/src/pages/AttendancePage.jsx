@@ -36,6 +36,7 @@ export default function AttendancePage() {
   const date = searchParams.get('date') ?? isoToday();
   const classId = searchParams.get('classId') ?? '';
   const status = searchParams.get('status') ?? '';
+  const verification = searchParams.get('verification') ?? '';
   const [search, setSearch] = useState('');
 
   const [override, setOverride] = useState(null);
@@ -53,8 +54,14 @@ export default function AttendancePage() {
   const { data: classes } = useQuery({ queryKey: ['classes'], queryFn: () => api.get('/api/classes') });
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['register', date, classId, status],
-    queryFn: () => api.get('/api/attendance/register', { date, classId: classId || undefined, status: status || undefined }),
+    queryKey: ['register', date, classId, status, verification],
+    queryFn: () =>
+      api.get('/api/attendance/register', {
+        date,
+        classId: classId || undefined,
+        status: status || undefined,
+        verification: verification || undefined,
+      }),
     refetchInterval: date === isoToday() ? 60_000 : false,
   });
 
@@ -166,6 +173,18 @@ export default function AttendancePage() {
               <option value="not_marked">Not marked</option>
             </select>
           </Field>
+          <Field label="Verified by">
+            <select
+              className="select"
+              value={verification}
+              onChange={(e) => setParam('verification', e.target.value)}
+              title="How the terminal identified the student. PIN or card is not a biometric check, so it could be somebody else."
+            >
+              <option value="">Any method</option>
+              <option value="biometric">Fingerprint</option>
+              <option value="non_biometric">PIN or card</option>
+            </select>
+          </Field>
           <Field label="Find a student">
             <input
               className="input"
@@ -181,7 +200,14 @@ export default function AttendancePage() {
             <button
               type="button"
               className="btn btn--sm"
-              onClick={() => api.download('/api/reports/daily', { date, classId: classId || undefined, format: 'csv' })}
+              onClick={() =>
+                api.download('/api/reports/daily', {
+                  date,
+                  classId: classId || undefined,
+                  verification: verification || undefined,
+                  format: 'csv',
+                })
+              }
             >
               Export CSV
             </button>
@@ -225,13 +251,23 @@ export default function AttendancePage() {
 
       <Card
         title="Register"
-        subtitle={`${rows.length} student${rows.length === 1 ? '' : 's'}`}
+        subtitle={
+          verification
+            ? `${rows.length} of ${summary.expected} student${summary.expected === 1 ? '' : 's'} — ${
+                verification === 'biometric' ? 'verified by fingerprint' : 'verified by PIN or card'
+              }`
+            : `${rows.length} student${rows.length === 1 ? '' : 's'}`
+        }
         flush
       >
         {rows.length === 0 ? (
           <EmptyState
-            title="No students match"
-            description="Try clearing the filters, or check that students are enrolled in a class."
+            title={verification === 'non_biometric' ? 'Every arrival was verified by fingerprint' : 'No students match'}
+            description={
+              verification === 'non_biometric'
+                ? 'Nobody was let through on a PIN or a card today.'
+                : 'Try clearing the filters, or check that students are enrolled in a class.'
+            }
           />
         ) : (
           <div className="table-wrap">

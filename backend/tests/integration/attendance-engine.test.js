@@ -402,6 +402,41 @@ describe('attendance engine', () => {
       expect(find(byCard.id)).toMatchObject({ verify_method: 'card', verified_biometrically: false });
     });
 
+    it('filters the register by how the arrival was verified', async () => {
+      const byFinger = await createStudent({ pin: '1001', classId: klass.id });
+      const byKeypad = await createStudent({ pin: '1002', classId: klass.id });
+      const byCard = await createStudent({ pin: '1003', classId: klass.id });
+      await createStudent({ pin: '1004', classId: klass.id }); // never scanned
+
+      await ingestPunches({
+        device,
+        records: [
+          punch('1001', '07:10:00', { verifyMode: 1 }),
+          punch('1002', '07:11:00', { verifyMode: 0 }),
+          punch('1003', '07:12:00', { verifyMode: 2 }),
+        ],
+      });
+
+      const all = await getDailyRegister({ date: DATE });
+      const biometric = await getDailyRegister({ date: DATE, verification: 'biometric' });
+      const flagged = await getDailyRegister({ date: DATE, verification: 'non_biometric' });
+
+      expect(all).toHaveLength(4);
+      expect(biometric.map((r) => r.student_id)).toEqual([byFinger.id]);
+      // This is the audit list: everyone the terminal let through without a
+      // biometric check, which is the proxy-attendance route.
+      expect(flagged.map((r) => r.student_id).sort()).toEqual([byKeypad.id, byCard.id].sort());
+    });
+
+    it('leaves students who never arrived out of both verification filters', async () => {
+      await createStudent({ pin: '1001', classId: klass.id });
+
+      // No punch at all is not "verified by a PIN" — it is no arrival to judge.
+      expect(await getDailyRegister({ date: DATE, verification: 'biometric' })).toHaveLength(0);
+      expect(await getDailyRegister({ date: DATE, verification: 'non_biometric' })).toHaveLength(0);
+      expect(await getDailyRegister({ date: DATE })).toHaveLength(1);
+    });
+
     it('reports nothing about verification when there was no punch', async () => {
       await createStudent({ pin: '1009', classId: klass.id });
 

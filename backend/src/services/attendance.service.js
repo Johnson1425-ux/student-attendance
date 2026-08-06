@@ -4,7 +4,12 @@ import { getAttendanceConfig } from './settings.service.js';
 import { isSchoolDay, listSchoolDays } from './calendar.service.js';
 import { recordAudit } from './audit.service.js';
 import { evaluateStudentStreak } from './alerts.service.js';
-import { describeVerifyMode, isBiometricVerification } from '../lib/adms/protocol.js';
+import {
+  describeVerifyMode,
+  isBiometricVerification,
+  BIOMETRIC_VERIFY_MODES,
+  NON_BIOMETRIC_VERIFY_MODES,
+} from '../lib/adms/protocol.js';
 import {
   parseDeviceTimestamp,
   toLocalDate,
@@ -473,7 +478,14 @@ export async function bulkSetAttendance({ studentIds, date, status, reason, acto
  * so a student who has not scanned yet appears as "not yet arrived" instead of
  * silently vanishing from the list.
  */
-export async function getDailyRegister({ date, classId = null, classScope = null, status = null, search = null }) {
+export async function getDailyRegister({
+  date,
+  classId = null,
+  classScope = null,
+  status = null,
+  search = null,
+  verification = null,
+}) {
   const params = [date];
   const conditions = [];
 
@@ -496,6 +508,14 @@ export async function getDailyRegister({ date, classId = null, classScope = null
   } else if (status) {
     params.push(status);
     conditions.push(`ar.status = $${params.length}::attendance_status`);
+  }
+
+  // Verification is an axis of its own, independent of present/late/absent:
+  // "which arrivals did the terminal accept without a fingerprint?" is an
+  // audit question, not an attendance one.
+  if (verification === 'biometric' || verification === 'non_biometric') {
+    params.push(verification === 'biometric' ? BIOMETRIC_VERIFY_MODES : NON_BIOMETRIC_VERIFY_MODES);
+    conditions.push(`fev.verify_mode = ANY($${params.length}::int[])`);
   }
 
   const where = conditions.length ? `AND ${conditions.join(' AND ')}` : '';

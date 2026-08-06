@@ -1,5 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
 import {
+  VERIFY_MODES,
+  BIOMETRIC_VERIFY_MODES,
+  NON_BIOMETRIC_VERIFY_MODES,
   isBiometricVerification,
   describeVerifyMode,
   parseAttlog,
@@ -189,5 +192,20 @@ describe('isBiometricVerification', () => {
     expect(describeVerifyMode(2)).toBe('card');
     expect(describeVerifyMode(0)).toBe('password');
     expect(describeVerifyMode(99)).toBe('unknown');
+  });
+});
+
+describe('verification mode sets', () => {
+  it('partition the known modes with no overlap and nothing missed', () => {
+    const both = [...BIOMETRIC_VERIFY_MODES, ...NON_BIOMETRIC_VERIFY_MODES];
+    // Derived from one table, so a mode added later cannot go missing from a
+    // filter built on these lists.
+    expect(new Set(both).size).toBe(both.length);
+    expect(both.sort((a, b) => a - b)).toEqual(Object.keys(VERIFY_MODES).map(Number).sort((a, b) => a - b));
+  });
+
+  it('agree with isBiometricVerification', () => {
+    for (const mode of BIOMETRIC_VERIFY_MODES) expect(isBiometricVerification(mode)).toBe(true);
+    for (const mode of NON_BIOMETRIC_VERIFY_MODES) expect(isBiometricVerification(mode)).toBe(false);
   });
 });

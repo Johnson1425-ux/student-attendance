@@ -37,10 +37,10 @@ function clampToToday(to, config) {
 // Daily
 // ---------------------------------------------------------------------------
 
-export async function dailyReport({ date, classId = null, classScope = null }) {
+export async function dailyReport({ date, classId = null, classScope = null, verification = null }) {
   const [summary, rows] = await Promise.all([
     getDailySummary({ date, classId, classScope }),
-    getDailyRegister({ date, classId, classScope }),
+    getDailyRegister({ date, classId, classScope, verification }),
   ]);
 
   const config = await getAttendanceConfig();
@@ -52,6 +52,9 @@ export async function dailyReport({ date, classId = null, classScope = null }) {
     isSchoolDay: schoolDays.length === 1,
     summary,
     rows,
+    // Recorded so an export can say what it covers: the summary counts the
+    // whole day, but the rows may be a filtered subset of it.
+    verification: verification && verification !== 'all' ? verification : null,
   };
 }
 
@@ -443,7 +446,8 @@ export const REPORT_COLUMNS = {
     { key: 'check_out_local', label: 'Check-out', width: 1.2 },
     { key: 'minutes_late', label: 'Mins late', width: 0.9, align: 'right', map: (r) => r.minutes_late ?? '' },
     { key: 'source', label: 'Source', width: 0.9 },
-    { key: 'override_reason', label: 'Note', width: 1.8 },
+    { key: 'verify_method', label: 'Verified by', width: 1.1 },
+    { key: 'override_reason', label: 'Note', width: 1.6 },
   ],
   student_summary: [
     { key: 'admission_number', label: 'Admission No.', width: 1.2 },
@@ -541,6 +545,8 @@ export function describeReport(report, { schoolName, classLabel, timezone } = {}
 
   const subtitleParts = [period];
   if (classLabel) subtitleParts.push(classLabel);
+  if (report.verification === 'non_biometric') subtitleParts.push('Arrivals verified by PIN or card only');
+  if (report.verification === 'biometric') subtitleParts.push('Biometric arrivals only');
   if (report.schoolDays !== undefined) subtitleParts.push(`${report.schoolDays} school day(s)`);
   if (report.type === 'student_detail') subtitleParts.push(report.student.full_name);
 

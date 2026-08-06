@@ -280,7 +280,18 @@ export function describeVerifyMode(mode) {
 }
 
 /** Verification methods that actually prove who was standing at the terminal. */
-const BIOMETRIC_MODES = new Set([1, 15, 25]); // fingerprint, face, palm
+export const BIOMETRIC_VERIFY_MODES = [1, 15, 25]; // fingerprint, face, palm
+const BIOMETRIC_MODES = new Set(BIOMETRIC_VERIFY_MODES);
+
+/**
+ * Known modes that are *not* a biometric check — a typed PIN or a card.
+ *
+ * Derived from the same table rather than listed separately, so a mode added
+ * to VERIFY_MODES can never be silently missing from a filter built on this.
+ */
+export const NON_BIOMETRIC_VERIFY_MODES = Object.keys(VERIFY_MODES)
+  .map(Number)
+  .filter((mode) => !BIOMETRIC_MODES.has(mode));
 
 /**
  * Whether a punch was verified biometrically.

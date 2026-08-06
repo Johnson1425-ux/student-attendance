@@ -160,10 +160,16 @@ A class with any enrolment history cannot be deleted — deactivate it instead.
 
 ## Attendance
 
-### `GET /api/attendance/register?date=&classId=&status=&search=`
+### `GET /api/attendance/register?date=&classId=&status=&search=&verification=`
 The daily register: every student expected that day, with their status. Students
 who have not scanned appear as `not_marked`. Defaults to today. Rows carry
 `verify_method` and `verified_biometrically` for the arrival punch.
+
+`verification` filters on that: `biometric` (fingerprint, face, palm) or
+`non_biometric` (PIN or card) — the audit list of arrivals the terminal
+accepted without a biometric check. Students who never arrived appear in
+neither, since there is no arrival to judge. `/api/reports/daily` accepts the
+same parameter, so a filtered view can be exported as it stands.
 
 → `{ "date": "…", "summary": {...}, "rows": [...] }`
 

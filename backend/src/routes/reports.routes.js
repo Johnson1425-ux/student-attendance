@@ -81,7 +81,14 @@ async function classLabelFor(classId) {
 
 router.get(
   '/daily',
-  validateQuery(z.object({ date: dateString.optional(), ...classQuery, ...formatQuery })),
+  validateQuery(
+    z.object({
+      date: dateString.optional(),
+      verification: z.enum(['all', 'biometric', 'non_biometric']).optional(),
+      ...classQuery,
+      ...formatQuery,
+    }),
+  ),
   async (req, res, next) => {
     try {
       if (req.query.classId) assertClassAccess(req, req.query.classId);
@@ -91,6 +98,7 @@ router.get(
         date,
         classId: req.query.classId ?? null,
         classScope: req.classScope,
+        verification: req.query.verification ?? null,
       });
       await respond(req, res, report, {
         filenameParts: ['daily-attendance', date],

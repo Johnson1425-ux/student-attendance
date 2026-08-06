@@ -14,7 +14,7 @@ Built to the requirements in [`docs/PRD.md`](docs/PRD.md).
 |---|---|
 | Student & class management | Students and Classes screens; CSV import |
 | Fingerprint enrolment | At the terminal; linked to student records automatically, with a queue for anything unmatched |
-| Automatic attendance capture | ADMS push endpoints under `/iclock`; the register and arrivals feed flag any arrival the terminal accepted without a biometric check |
+| Automatic attendance capture | ADMS push endpoints under `/iclock`; the register and arrivals feed flag — and can filter to — any arrival the terminal accepted without a biometric check |
 | Live attendance dashboard | Dashboard and the daily register |
 | Reports (daily/weekly/monthly/per class/per student) | Reports workspace, exportable as CSV and PDF |
 | Manual override | In-place corrections on the register, single or bulk, always with a reason |
@@ -66,7 +66,7 @@ backend/          Node.js + Express API
     lib/adms/     Terminal wire-protocol codec (no I/O, directly testable)
     db/           Schema migrations, connection pool, seeding
     jobs/         Nightly finalisation and housekeeping
-  tests/          187 unit and integration tests, run against real PostgreSQL
+  tests/          191 unit and integration tests, run against real PostgreSQL
 
 frontend/         React (Vite) dashboard
   src/
@@ -142,7 +142,7 @@ createdb attendance_test
 cd backend && npm test
 ```
 
-187 tests. Unit tests cover the ADMS codec against real captured payloads,
+191 tests. Unit tests cover the ADMS codec against real captured payloads,
 timezone handling across the UTC boundary, temporary-password generation, and
 CSV escaping. Integration tests
 run against a real PostgreSQL database and cover the attendance engine
