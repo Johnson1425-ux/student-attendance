@@ -293,9 +293,54 @@ or use the supplier's device-to-device user transfer.
 
 ## 8. Testing without hardware
 
-The protocol is plain HTTP, so a terminal can be simulated with `curl`. This is
-how the integration tests exercise it, and it is useful for demonstrating the
-system before the device arrives.
+The protocol is plain HTTP, so a terminal can be simulated entirely in software.
+This is how the integration tests exercise it, and it is the fastest way to
+prove the system works before the device arrives.
+
+### The easy way: the simulator script
+
+`scripts/` contains a simulator for both shells. It signs in, registers (or
+reuses) a terminal, picks a student, performs the handshake, sends a punch, and
+reads the register back to show what the system made of it.
+
+```powershell
+# Windows
+cd scripts
+.\simulate-terminal.ps1 -Password 'your-admin-password'
+```
+
+```bash
+# Linux / macOS
+cd scripts
+./simulate-terminal.sh -p 'your-admin-password'
+```
+
+Useful variations — each exercises a rule worth confirming:
+
+| Flag (PowerShell / bash) | What it proves |
+|---|---|
+| *(none)* | A normal arrival is captured and appears on the register |
+| `-Late` / `-l` | An arrival after the cut-off is recorded as late, with the minutes |
+| `-Pin 9999` / `-n 9999` | An unknown PIN becomes an *unmatched scan* rather than vanishing |
+| `-Duplicate` / `-d` | Re-sending the same punch does not create a second record |
+| `-Time 07:15` / `-t 07:15` | A specific arrival time, rather than "now" |
+
+The scripts pick a student who has **not** scanned yet where possible. The
+register keeps the *earliest* punch of the day as the check-in, so sending a
+punch for someone who already arrived correctly changes nothing — which looks
+like a failure if you are not expecting it.
+
+### On Windows, `curl` is not curl
+
+In PowerShell, `curl` is an alias for `Invoke-WebRequest`, which takes entirely
+different arguments. The bash examples below will fail there with confusing
+parameter errors. Use `curl.exe` explicitly, or use the script above.
+
+Multi-line commands with backtick continuations are also easily broken by
+copy-and-paste, producing `A positional parameter cannot be found`. Running a
+script file avoids the problem altogether.
+
+### By hand, with curl
 
 ```bash
 BASE=http://localhost:4000
@@ -322,3 +367,7 @@ curl "$BASE/iclock/getrequest?SN=$SN&key=$KEY"
 
 Sending the same punch twice is safe — the second is recognised as a duplicate
 and ignored.
+
+The timestamp you send is interpreted as **school-local wall-clock time**,
+exactly as a terminal reports it. That is why a scan sent at 08:30 comes back
+as late while one sent at 07:12 does not.

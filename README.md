@@ -74,6 +74,10 @@ frontend/         React (Vite) dashboard
     components/   Shared UI vocabulary and the app shell
     api/          Fetch client with transparent token refresh
 
+scripts/
+  simulate-terminal.ps1     Terminal simulator (Windows PowerShell)
+  simulate-terminal.sh      Terminal simulator (Linux / macOS)
+
 docs/
   PRD.md                    The original requirements
   API.md                    REST API reference
@@ -118,9 +122,11 @@ The terminal must support **ADMS / push-data over the internet** — see PRD §5
 confirm with the supplier before buying, how to configure the device, and how to
 diagnose it when attendance stops arriving.
 
-The protocol is plain-text HTTP, so the whole integration can be exercised with
-`curl` before any hardware arrives; there is a worked example at the end of that
-document.
+The protocol is plain-text HTTP, so the whole integration can be exercised in
+software before any hardware arrives. `scripts/simulate-terminal.ps1` (Windows)
+and `scripts/simulate-terminal.sh` (Linux/macOS) act as a terminal: handshake,
+send a punch, and read the register back. Flags cover a late arrival, an unknown
+PIN, and a duplicate push.
 
 **Fingerprint templates never leave the device.** The protocol parser reads the
 enrolment metadata it needs — which finger, when, on which terminal — and
