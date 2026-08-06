@@ -25,6 +25,12 @@
 .PARAMETER Duplicate
   Send the same punch twice, to prove the terminal's retry is safe to repeat.
 
+.PARAMETER CheckOut
+  Send a departure punch for somebody who has already arrived today, timed far
+  enough after their arrival to count as a check-out. Without this, running the
+  script twice scans two *different* students a few minutes apart, which can
+  never produce a check-out.
+
 .EXAMPLE
   .\simulate-terminal.ps1 -Password 'your-admin-password'
 
@@ -43,7 +49,8 @@ param(
   [string]$Pin,
   [string]$Time,
   [switch]$Late,
-  [switch]$Duplicate
+  [switch]$Duplicate,
+  [switch]$CheckOut
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,13 +95,23 @@ Write-Step '3. Choosing a student'
 $registerBefore = (Invoke-RestMethod -Uri "$BaseUrl/api/attendance/register" -Headers $H).rows
 
 if ([string]::IsNullOrWhiteSpace($Pin)) {
-  # Prefer somebody who has not scanned yet today. The register keeps the
-  # *earliest* punch of the day as the check-in, so sending a punch for a
-  # student who already arrived would change nothing visible and make the
-  # result look wrong.
-  $candidate = $registerBefore | Where-Object { $_.device_user_pin -and $_.status -eq 'not_marked' } | Select-Object -First 1
-  if ($null -eq $candidate) {
-    $candidate = $registerBefore | Where-Object { $_.device_user_pin } | Select-Object -First 1
+  if ($CheckOut) {
+    # A departure needs somebody who has already arrived and not yet left.
+    $candidate = $registerBefore | Where-Object { $_.device_user_pin -and $_.check_in_at -and -not $_.check_out_at } | Select-Object -First 1
+    if ($null -eq $candidate) {
+      Write-Host '  Nobody has checked in today, so there is no departure to record.' -ForegroundColor Red
+      Write-Host '  Run the script without -CheckOut first to send an arrival.' -ForegroundColor Red
+      exit 1
+    }
+  } else {
+    # Prefer somebody who has not scanned yet today. The register keeps the
+    # *earliest* punch of the day as the check-in, so sending a punch for a
+    # student who already arrived would change nothing visible and make the
+    # result look wrong.
+    $candidate = $registerBefore | Where-Object { $_.device_user_pin -and $_.status -eq 'not_marked' } | Select-Object -First 1
+    if ($null -eq $candidate) {
+      $candidate = $registerBefore | Where-Object { $_.device_user_pin } | Select-Object -First 1
+    }
   }
   if ($null -eq $candidate) {
     Write-Host '  No student has a terminal PIN yet.' -ForegroundColor Red
@@ -120,20 +137,43 @@ $firstLine = ($handshake -split "`r?`n")[0]
 Write-Ok $firstLine
 
 # --- 5. Push the punch ------------------------------------------------------
-if ($Late) {
+$today = (Get-Date).ToString('yyyy-MM-dd')
+
+if ($CheckOut) {
+  # A later punch only counts as leaving once the student has been in school
+  # for minimum_checkout_gap_minutes. Read that from settings rather than
+  # assuming, and clear it by a few minutes.
+  $settings = Invoke-RestMethod -Uri "$BaseUrl/api/settings" -Headers $H
+  $gap = [int]$settings.minimum_checkout_gap_minutes
+
+  $todayPunches = Invoke-RestMethod -Uri "$BaseUrl/api/attendance/events?limit=200&date=$today" -Headers $H
+  $arrival = ($todayPunches | Where-Object { $_.device_user_pin -eq $Pin } | Sort-Object local_time | Select-Object -First 1).local_time
+  if ($null -eq $arrival) {
+    Write-Host "  PIN $Pin has not arrived today, so there is no departure to record." -ForegroundColor Red
+    exit 1
+  }
+
+  $departure = [datetime]::ParseExact($arrival, 'HH:mm:ss', $null).AddMinutes($gap + 5)
+  if ($departure.Day -ne [datetime]::ParseExact($arrival, 'HH:mm:ss', $null).Day) {
+    Write-Host "  Arrival was at $arrival; adding $gap minutes runs past midnight." -ForegroundColor Red
+    Write-Host '  Send an earlier arrival first, e.g. -Time 07:05.' -ForegroundColor Red
+    exit 1
+  }
+  $clock = $departure.ToString('HH:mm:ss')
+  Write-Info "arrived $arrival, check-out gap is $gap min, so departing at $clock"
+} elseif ($Late) {
   $clock = '08:30:00'
 } elseif ($Time) {
   $clock = "$Time`:00"
 } else {
   $clock = (Get-Date).ToString('HH:mm:ss')
 }
-$today = (Get-Date).ToString('yyyy-MM-dd')
 $stamp = "$today $clock"
 
 # Tab separated: PIN, timestamp, punch state, verify mode.
 $scan = "$Pin`t$stamp`t0`t1`n"
 
-Write-Step "5. Sending a scan at $stamp"
+Write-Step "5. Sending a $(if ($CheckOut) { 'departure' } else { 'scan' }) at $stamp"
 $response = Invoke-RestMethod -Method Post -ContentType 'text/plain' -Body $scan -Uri "$BaseUrl/iclock/cdata?SN=$Serial&table=ATTLOG&key=$Secret"
 Write-Ok "terminal received: $($response.ToString().Trim())"
 
@@ -148,7 +188,7 @@ Start-Sleep -Milliseconds 500
 
 # The events feed reports local_time as a plain school-local string, which
 # avoids any timezone guesswork when printing it back here.
-$events = Invoke-RestMethod -Uri "$BaseUrl/api/attendance/events?limit=100" -Headers $H
+$events = Invoke-RestMethod -Uri "$BaseUrl/api/attendance/events?limit=100&date=$today" -Headers $H
 $mine = $events | Where-Object { $_.device_user_pin -eq $Pin } | Select-Object -First 1
 if ($null -ne $mine) {
   Write-Ok "punch stored at $($mine.local_time) school time on $($mine.local_date)"
@@ -170,6 +210,11 @@ if ($null -eq $row) {
 } else {
   Write-Ok "$($row.full_name) is marked $($row.status)"
   Write-Info "class: $($row.class_name)"
+  if ($row.check_out_at) {
+    Write-Ok 'check-out recorded'
+  } elseif ($CheckOut) {
+    Write-Host '  No check-out recorded — the punch was not far enough after the arrival.' -ForegroundColor Yellow
+  }
   if ($row.minutes_late -gt 0) { Write-Info "late by $($row.minutes_late) minutes" }
   if ($row.status -eq 'present' -and $Late) {
     Write-Host '  Expected late but got present — this student had an earlier punch today,' -ForegroundColor Yellow

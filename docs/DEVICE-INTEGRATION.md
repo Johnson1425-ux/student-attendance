@@ -324,11 +324,36 @@ Useful variations — each exercises a rule worth confirming:
 | `-Pin 9999` / `-n 9999` | An unknown PIN becomes an *unmatched scan* rather than vanishing |
 | `-Duplicate` / `-d` | Re-sending the same punch does not create a second record |
 | `-Time 07:15` / `-t 07:15` | A specific arrival time, rather than "now" |
+| `-CheckOut` / `-o` | A departure punch, timed to actually register as a check-out |
 
 The scripts pick a student who has **not** scanned yet where possible. The
 register keeps the *earliest* punch of the day as the check-in, so sending a
 punch for someone who already arrived correctly changes nothing — which looks
 like a failure if you are not expecting it.
+
+### Testing check-out
+
+A later punch only becomes a check-out once the student has been in school for
+`minimum_checkout_gap_minutes` (60 by default). Two things make this awkward to
+test by hand, and `-CheckOut` / `-o` handles both:
+
+* running the script twice sends two punches minutes apart, well inside the
+  gap, so neither counts as a departure;
+* without an explicit PIN each run picks a *different* student, so the second
+  punch is not even for the same person.
+
+`-CheckOut` reads the configured gap, finds that student's arrival time today,
+and sends a departure comfortably past it:
+
+```
+arrived 07:05:00, check-out gap is 60 min, so departing at 08:10:00
+  punch stored at 08:10:00 school time on 2026-08-06
+  Anna Mushi is marked present
+  check-out recorded
+```
+
+Check-out is optional in this system — the register's job is arrivals, and a
+student with no departure punch is not treated as a problem.
 
 ### On Windows, `curl` is not curl
 

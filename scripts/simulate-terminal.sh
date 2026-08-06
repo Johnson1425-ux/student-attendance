@@ -12,6 +12,7 @@
 #   ./simulate-terminal.sh -p 'pw' -n 1002 -l          # a late arrival
 #   ./simulate-terminal.sh -p 'pw' -n 9999             # an unmatched scan
 #   ./simulate-terminal.sh -p 'pw' -t 07:15 -d         # a specific time, sent twice
+#   ./simulate-terminal.sh -p 'pw' -o                  # a departure, for check-out
 #
 # The PowerShell equivalent is simulate-terminal.ps1.
 
@@ -25,13 +26,14 @@ PIN=""
 TIME=""
 LATE=0
 DUPLICATE=0
+CHECKOUT=0
 
 usage() {
   sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
-while getopts "u:e:p:s:n:t:ldh" opt; do
+while getopts "u:e:p:s:n:t:ldoh" opt; do
   case "$opt" in
     u) BASE_URL="$OPTARG" ;;
     e) EMAIL="$OPTARG" ;;
@@ -41,6 +43,7 @@ while getopts "u:e:p:s:n:t:ldh" opt; do
     t) TIME="$OPTARG" ;;
     l) LATE=1 ;;
     d) DUPLICATE=1 ;;
+    o) CHECKOUT=1 ;;
     h) usage 0 ;;
     *) usage 1 ;;
   esac
@@ -98,14 +101,23 @@ if [ -z "$PIN" ]; then
   # Prefer somebody who has not scanned yet. The register keeps the *earliest*
   # punch of the day, so a punch for a student who already arrived changes
   # nothing visible and makes the result look wrong.
-  read -r PIN PICKED <<<"$(echo "$REGISTER" | jqp ";
+  read -r PIN PICKED <<<"$(echo "$REGISTER" | CHECKOUT="$CHECKOUT" jqp ",os
 d=json.load(sys.stdin)['rows']
-c=next((r for r in d if r['device_user_pin'] and r['status']=='not_marked'), None) \
-  or next((r for r in d if r['device_user_pin']), None)
+if os.environ['CHECKOUT']=='1':
+    # A departure needs somebody who has already arrived and not yet left.
+    c=next((r for r in d if r['device_user_pin'] and r['check_in_at'] and not r['check_out_at']), None)
+else:
+    c=next((r for r in d if r['device_user_pin'] and r['status']=='not_marked'), None) \
+      or next((r for r in d if r['device_user_pin']), None)
 print(f\"{c['device_user_pin']} {c['full_name']}\" if c else ' ')")"
   if [ -z "$PIN" ]; then
-    red "No student has a terminal PIN yet."
-    red "Add one under Students, or pass -n 9999 to test an unmatched scan."
+    if [ "$CHECKOUT" -eq 1 ]; then
+      red "Nobody has checked in today, so there is no departure to record."
+      red "Run without -o first to send an arrival."
+    else
+      red "No student has a terminal PIN yet."
+      red "Add one under Students, or pass -n 9999 to test an unmatched scan."
+    fi
     exit 1
   fi
   green "using $PICKED (PIN $PIN)"
@@ -126,12 +138,35 @@ cyan "4. Handshake"
 green "$(curl -s "$BASE_URL/iclock/cdata?SN=$SERIAL&options=all&pushver=2.4.1&key=$SECRET" | head -1)"
 
 # --- 5. Push the punch -------------------------------------------------------
-if [ "$LATE" -eq 1 ]; then CLOCK="08:30:00"
+TODAY="$(date +%Y-%m-%d)"
+
+if [ "$CHECKOUT" -eq 1 ]; then
+  # A later punch only counts as leaving once the student has been in school
+  # for minimum_checkout_gap_minutes. Read that rather than assuming it, and
+  # clear it by a few minutes. Scoped to today, or an earlier local time from a
+  # previous day would be mistaken for this morning's arrival.
+  GAP=$(curl -s "$BASE_URL/api/settings" -H "$AUTH" | jqp ";print(json.load(sys.stdin)['minimum_checkout_gap_minutes'])")
+  ARRIVAL=$(curl -s "$BASE_URL/api/attendance/events?limit=200&date=$TODAY" -H "$AUTH" | jqp ";
+e=[x for x in json.load(sys.stdin) if x['device_user_pin']=='$PIN']
+print(min(x['local_time'] for x in e) if e else '')")
+  if [ -z "$ARRIVAL" ]; then
+    red "PIN $PIN has not arrived today, so there is no departure to record."
+    exit 1
+  fi
+  CLOCK=$(date -d "$ARRIVAL today + $((GAP + 5)) minutes" +%H:%M:%S)
+  if [ "$(date -d "$ARRIVAL today + $((GAP + 5)) minutes" +%Y-%m-%d)" != "$TODAY" ]; then
+    red "Arrival was at $ARRIVAL; adding $GAP minutes runs past midnight."
+    red "Send an earlier arrival first, e.g. -t 07:05."
+    exit 1
+  fi
+  grey "arrived $ARRIVAL, check-out gap is $GAP min, so departing at $CLOCK"
+elif [ "$LATE" -eq 1 ]; then CLOCK="08:30:00"
 elif [ -n "$TIME" ]; then CLOCK="$TIME:00"
 else CLOCK="$(date +%H:%M:%S)"; fi
-STAMP="$(date +%Y-%m-%d) $CLOCK"
+STAMP="$TODAY $CLOCK"
 
-cyan "5. Sending a scan at $STAMP"
+LABEL=$([ "$CHECKOUT" -eq 1 ] && echo departure || echo scan)
+cyan "5. Sending a $LABEL at $STAMP"
 send_punch() {
   printf '%s\t%s\t0\t1\n' "$PIN" "$STAMP" \
     | curl -s --data-binary @- -H 'Content-Type: text/plain' \
@@ -148,7 +183,7 @@ sleep 1
 
 # local_time is a plain school-local string, so printing it needs no timezone
 # guesswork here.
-curl -s "$BASE_URL/api/attendance/events?limit=100" -H "$AUTH" | jqp ";
+curl -s "$BASE_URL/api/attendance/events?limit=100&date=$TODAY" -H "$AUTH" | jqp ";
 e=next((x for x in json.load(sys.stdin) if x['device_user_pin']=='$PIN'), None)
 print(f\"  \033[32mpunch stored at {e['local_time']} school time on {e['local_date']}\033[0m\" if e else '', end='\n' if e else '')"
 
@@ -173,6 +208,11 @@ else
   grey "$(echo "$ROW" | jqp ";r=json.load(sys.stdin);print(f\"class: {r['class_name']}\")")"
   MINS=$(echo "$ROW" | jqp ";print(json.load(sys.stdin).get('minutes_late') or 0)")
   [ "$MINS" -gt 0 ] && grey "late by $MINS minutes"
+  if echo "$ROW" | grep -q '"check_out_at": *"'; then
+    green "check-out recorded"
+  elif [ "$CHECKOUT" -eq 1 ]; then
+    amber "No check-out recorded — the punch was not far enough after the arrival."
+  fi
 fi
 
 cyan "Done. The dashboard should show this too."
