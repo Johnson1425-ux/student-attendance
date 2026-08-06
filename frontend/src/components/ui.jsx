@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { STATUS_LABELS, formatPercent, rateTone } from '../utils/format.js';
+import { STATUS_LABELS, VERIFY_LABELS, formatPercent, rateTone } from '../utils/format.js';
 
 /**
  * Small presentational building blocks shared by every screen. Keeping them in
@@ -40,6 +40,37 @@ export function StatusBadge({ status }) {
     <span className={`badge badge--${key}`}>
       <span className="badge__dot" aria-hidden="true" />
       {STATUS_LABELS[key] ?? key}
+    </span>
+  );
+}
+
+/**
+ * How a punch was verified.
+ *
+ * A fingerprint is the expected case, so it is rendered quietly. Anything the
+ * terminal accepted *without* a biometric check — a typed PIN, a card — is
+ * called out, because that is the gap through which one student can mark
+ * another present (PRD §2). Showing the exception rather than repeating the
+ * rule keeps a 96-row register readable.
+ */
+export function VerifyBadge({ method, biometric }) {
+  if (!method) return null;
+  const label = VERIFY_LABELS[method] ?? method;
+
+  if (biometric) {
+    return (
+      <span className="small subtle no-wrap" title={`Verified by ${label}`}>
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="badge badge--late"
+      title={`Verified by ${label}, not by fingerprint — this could be somebody else entering the PIN`}
+    >
+      ⚠ {label}
     </span>
   );
 }

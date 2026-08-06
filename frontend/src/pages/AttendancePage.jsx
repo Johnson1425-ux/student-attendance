@@ -15,6 +15,7 @@ import {
   Field,
   Spinner,
   Alert,
+  VerifyBadge,
 } from '../components/ui.jsx';
 import { formatTime, formatPercent, isoToday } from '../utils/format.js';
 
@@ -295,7 +296,14 @@ export default function AttendancePage() {
                       ) : row.status === 'not_marked' ? (
                         <span className="subtle small">—</span>
                       ) : (
-                        <span className="small muted">{row.device_name ?? row.source}</span>
+                        <>
+                          <span className="small muted">{row.device_name ?? row.source}</span>
+                          {row.verify_method && (
+                            <div style={{ marginTop: 2 }}>
+                              <VerifyBadge method={row.verify_method} biometric={row.verified_biometrically} />
+                            </div>
+                          )}
+                        </>
                       )}
                       {row.recorded_by_name && <div className="table__secondary">by {row.recorded_by_name}</div>}
                     </td>

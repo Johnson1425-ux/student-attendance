@@ -12,7 +12,17 @@ import {
 } from 'recharts';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Card, Stat, StatusBadge, RateMeter, Loading, ErrorState, EmptyState, HealthIndicator } from '../components/ui.jsx';
+import {
+  Card,
+  Stat,
+  StatusBadge,
+  RateMeter,
+  Loading,
+  ErrorState,
+  EmptyState,
+  HealthIndicator,
+  VerifyBadge,
+} from '../components/ui.jsx';
 import { formatTime, formatShortDate, formatRelative, formatPercent } from '../utils/format.js';
 
 /**
@@ -208,6 +218,11 @@ export default function DashboardPage() {
                       <div className="table__secondary truncate">
                         {event.class_name ?? 'Not linked to a student'} · {event.device_name ?? 'terminal'}
                       </div>
+                      {event.verify_method && (
+                        <div style={{ marginTop: 2 }}>
+                          <VerifyBadge method={event.verify_method} biometric={event.verified_biometrically} />
+                        </div>
+                      )}
                     </div>
                     {event.status && <StatusBadge status={event.status} />}
                   </div>

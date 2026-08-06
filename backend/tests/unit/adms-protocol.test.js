@@ -1,5 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import {
+  isBiometricVerification,
+  describeVerifyMode,
   parseAttlog,
   parseOperlog,
   parseDeviceOptions,
@@ -154,5 +156,38 @@ describe('response builders', () => {
   it('acknowledges a batch with its count', () => {
     expect(okResponse(12)).toBe('OK: 12\r\n');
     expect(okResponse()).toBe('OK\r\n');
+  });
+});
+
+describe('isBiometricVerification', () => {
+  // The distinction PRD §2 rests on: a terminal that accepts a typed PIN or a
+  // card lets one student mark another present, which is the proxy attendance
+  // the biometric system exists to stop.
+  it('treats fingerprint, face and palm as biometric', () => {
+    expect(isBiometricVerification(1)).toBe(true);   // fingerprint
+    expect(isBiometricVerification(15)).toBe(true);  // face
+    expect(isBiometricVerification(25)).toBe(true);  // palm
+  });
+
+  it('treats password and card as not biometric', () => {
+    expect(isBiometricVerification(0)).toBe(false);  // password
+    expect(isBiometricVerification(3)).toBe(false);  // password
+    expect(isBiometricVerification(2)).toBe(false);  // card
+    expect(isBiometricVerification(4)).toBe(false);  // card
+  });
+
+  it('answers null when there is no information, rather than guessing', () => {
+    // Distinguishing "we know it was not biometric" from "we do not know"
+    // matters: only the former is worth flagging to staff.
+    expect(isBiometricVerification(null)).toBeNull();
+    expect(isBiometricVerification(undefined)).toBeNull();
+    expect(isBiometricVerification(99)).toBeNull();
+  });
+
+  it('names each mode for display', () => {
+    expect(describeVerifyMode(1)).toBe('fingerprint');
+    expect(describeVerifyMode(2)).toBe('card');
+    expect(describeVerifyMode(0)).toBe('password');
+    expect(describeVerifyMode(99)).toBe('unknown');
   });
 });

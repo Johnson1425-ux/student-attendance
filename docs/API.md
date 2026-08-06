@@ -162,7 +162,8 @@ A class with any enrolment history cannot be deleted — deactivate it instead.
 
 ### `GET /api/attendance/register?date=&classId=&status=&search=`
 The daily register: every student expected that day, with their status. Students
-who have not scanned appear as `not_marked`. Defaults to today.
+who have not scanned appear as `not_marked`. Defaults to today. Rows carry
+`verify_method` and `verified_biometrically` for the arrival punch.
 
 → `{ "date": "…", "summary": {...}, "rows": [...] }`
 
@@ -175,6 +176,12 @@ Per-class breakdown for the given day.
 
 ### `GET /api/attendance/events?limit=&date=`
 Recent scans, newest first — the live arrivals feed.
+
+Both this and the register report how each punch was verified:
+`verify_method` (`fingerprint` · `face` · `palm` · `card` · `password`) and
+`verified_biometrically` (`true` · `false` · `null` when unknown). A terminal
+that accepts a typed PIN or a card is a proxy-attendance route, so the
+dashboard flags those rather than reporting every method identically.
 
 ### `GET /api/attendance/unmatched` — *admin, office staff*
 PINs that have scanned but match no student, grouped with scan counts.

@@ -4,6 +4,7 @@ import { getAttendanceConfig } from './settings.service.js';
 import { isSchoolDay, listSchoolDays } from './calendar.service.js';
 import { recordAudit } from './audit.service.js';
 import { evaluateStudentStreak } from './alerts.service.js';
+import { describeVerifyMode, isBiometricVerification } from '../lib/adms/protocol.js';
 import {
   parseDeviceTimestamp,
   toLocalDate,
@@ -507,7 +508,8 @@ export async function getDailyRegister({ date, classId = null, classScope = null
             ar.id AS record_id, ar.status, ar.source, ar.check_in_at, ar.check_out_at,
             ar.minutes_late, ar.is_manual_override, ar.override_reason, ar.finalized_at,
             u.full_name AS recorded_by_name,
-            d.name AS device_name
+            d.name AS device_name,
+            fev.verify_mode
        FROM students s
        JOIN enrollments e ON e.student_id = s.id AND e.end_date IS NULL
        JOIN classes c ON c.id = e.class_id
@@ -515,6 +517,9 @@ export async function getDailyRegister({ date, classId = null, classScope = null
               ON ar.student_id = s.id AND ar.attendance_date = $1::date
        LEFT JOIN users u ON u.id = ar.recorded_by
        LEFT JOIN devices d ON d.id = ar.device_id
+       -- The arrival punch is what the status was derived from, so its
+       -- verification method is the one worth reporting.
+       LEFT JOIN attendance_events fev ON fev.id = ar.first_event_id
       WHERE s.status = 'active'
         AND s.enrolled_on <= $1::date
         AND (s.exited_on IS NULL OR s.exited_on >= $1::date)
@@ -527,7 +532,26 @@ export async function getDailyRegister({ date, classId = null, classScope = null
     ...row,
     status: row.status ?? 'not_marked',
     full_name: [row.first_name, row.middle_name, row.last_name].filter(Boolean).join(' '),
+    ...describeVerification(row.verify_mode),
   }));
+}
+
+/**
+ * Turn the raw ADMS verify mode into something a screen can render.
+ *
+ * `verified_biometrically` is deliberately three-valued: false means the
+ * terminal accepted a PIN or a card, which is a proxy-attendance risk worth
+ * flagging; null means we simply have no record of how they were verified
+ * (a manual correction, or a day with no punch at all).
+ */
+function describeVerification(mode) {
+  if (mode === null || mode === undefined) {
+    return { verify_method: null, verified_biometrically: null };
+  }
+  return {
+    verify_method: describeVerifyMode(mode),
+    verified_biometrically: isBiometricVerification(mode),
+  };
 }
 
 /** Headline counts for a date, optionally narrowed to one class. */
@@ -642,7 +666,7 @@ export async function getRecentEvents({ limit = 25, classScope = null, date = nu
       LIMIT $1`,
     params,
   );
-  return rows;
+  return rows.map((row) => ({ ...row, ...describeVerification(row.verify_mode) }));
 }
 
 /** Scans whose PIN matches no student — enrollment gaps needing office action. */

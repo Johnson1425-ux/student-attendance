@@ -375,6 +375,43 @@ describe('attendance engine', () => {
       expect(register.find((r) => r.first_name === 'Juma').status).toBe('not_marked');
     });
 
+    it('reports how each arrival was verified', async () => {
+      const byFinger = await createStudent({ pin: '1001', firstName: 'Finger', classId: klass.id });
+      const byKeypad = await createStudent({ pin: '1002', firstName: 'Keypad', classId: klass.id });
+      const byCard = await createStudent({ pin: '1003', firstName: 'Card', classId: klass.id });
+
+      await ingestPunches({
+        device,
+        records: [
+          punch('1001', '07:10:00', { verifyMode: 1 }),
+          punch('1002', '07:11:00', { verifyMode: 0 }),
+          punch('1003', '07:12:00', { verifyMode: 2 }),
+        ],
+      });
+
+      const register = await getDailyRegister({ date: DATE });
+      const find = (id) => register.find((r) => r.student_id === id);
+
+      expect(find(byFinger.id)).toMatchObject({
+        verify_method: 'fingerprint',
+        verified_biometrically: true,
+      });
+      // A typed PIN or a card is how proxy attendance gets in, so the register
+      // has to be able to say so.
+      expect(find(byKeypad.id)).toMatchObject({ verify_method: 'password', verified_biometrically: false });
+      expect(find(byCard.id)).toMatchObject({ verify_method: 'card', verified_biometrically: false });
+    });
+
+    it('reports nothing about verification when there was no punch', async () => {
+      await createStudent({ pin: '1009', classId: klass.id });
+
+      const [row] = await getDailyRegister({ date: DATE });
+
+      expect(row.status).toBe('not_marked');
+      expect(row.verify_method).toBeNull();
+      expect(row.verified_biometrically).toBeNull();
+    });
+
     it('summarises the day', async () => {
       await createStudent({ pin: '1001', classId: klass.id });
       await createStudent({ pin: '1002', classId: klass.id });

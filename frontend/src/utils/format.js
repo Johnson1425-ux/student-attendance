@@ -25,6 +25,21 @@ export const STATUS_COLORS = {
   not_recorded: 'var(--unmarked)',
 };
 
+/**
+ * How a punch was verified, in words a member of staff would use. ZKTeco calls
+ * keypad entry "password"; on a school terminal that is a typed PIN, so it is
+ * labelled as such.
+ */
+export const VERIFY_LABELS = {
+  fingerprint: 'fingerprint',
+  face: 'face',
+  palm: 'palm',
+  card: 'card',
+  password: 'PIN entry',
+  other: 'other method',
+  unknown: 'unknown method',
+};
+
 export function formatTime(instant, timezone) {
   if (!instant) return '—';
   return new Intl.DateTimeFormat('en-GB', {

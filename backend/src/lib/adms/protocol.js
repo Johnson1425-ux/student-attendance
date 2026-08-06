@@ -278,3 +278,21 @@ export function describePunchState(state) {
 export function describeVerifyMode(mode) {
   return VERIFY_MODES[mode] ?? 'unknown';
 }
+
+/** Verification methods that actually prove who was standing at the terminal. */
+const BIOMETRIC_MODES = new Set([1, 15, 25]); // fingerprint, face, palm
+
+/**
+ * Whether a punch was verified biometrically.
+ *
+ * This is the distinction that matters for PRD §2: a terminal that permits
+ * password or card fallback lets one student mark another present by typing
+ * their PIN, which is exactly the proxy attendance the biometric system is
+ * meant to eliminate. Returns null when the mode is unknown or absent, so
+ * callers can tell "not biometric" apart from "no information".
+ */
+export function isBiometricVerification(mode) {
+  if (mode === null || mode === undefined) return null;
+  if (!(mode in VERIFY_MODES)) return null;
+  return BIOMETRIC_MODES.has(Number(mode));
+}
