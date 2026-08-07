@@ -168,7 +168,82 @@ day is closed, "absent" and "has not arrived yet" are the same thing.
 
 ---
 
-## 6. Post-deployment checklist
+## 6. Backups
+
+Render's paid PostgreSQL includes daily backups. Everywhere else — a laptop, or
+a free-tier managed database — backups are your responsibility, and this is the
+single largest risk in those setups. Neon's free plan, for instance, keeps only
+**6 hours** of point-in-time recovery, so a Friday problem noticed on Monday is
+unrecoverable.
+
+`scripts/` contains a backup and a restore for both shells:
+
+```powershell
+# Windows
+.\backup-database.ps1 -Folder 'D:\OneDrive\AttendanceBackups' -KeepDays 30
+```
+
+```bash
+# Linux / macOS
+./backup-database.sh -f ~/Dropbox/AttendanceBackups -k 30
+```
+
+With no arguments they read `DATABASE_URL` from `backend/.env`, so there is one
+place to configure and it cannot drift out of step with the application. Each
+run takes a compressed dump, **reads it back to confirm it is not truncated**,
+prunes anything past the retention window, and appends to a log beside the
+dumps. They exit non-zero on failure, so a scheduler reports a broken backup
+instead of silently recording success.
+
+The database is connected to *outbound*, so this works identically whether it
+is on Neon, on Render or on the same machine — nothing has to reach in through
+your router.
+
+A dump of a full school year is 10–15 MB. Point the folder at something that
+syncs to the cloud: a backup living only on the machine it protects is not a
+backup, and at this size the second copy is free.
+
+### Scheduling it
+
+On Windows, **Task Scheduler → Create Task**, daily at 21:00, action
+`pwsh.exe -File C:\path\to\scripts\backup-database.ps1`. Tick **"Run task as
+soon as possible after a scheduled start is missed"** — otherwise a night the
+machine is off passes silently.
+
+On Linux, a crontab entry:
+
+```
+0 21 * * *  /path/to/scripts/backup-database.sh >> /var/log/attendance-backup.log 2>&1
+```
+
+### Rehearse the restore
+
+A backup nobody has restored is a hope, not a plan. Do it once into a scratch
+database:
+
+```powershell
+.\restore-database.ps1 -ConnectionString 'postgres://user:pw@localhost:5432/attendance_check'
+```
+
+It prints the row counts it recovered so you can compare them against what you
+expect. The real restore is the same command without the scratch target; it asks
+you to type the database name first, because it replaces everything.
+
+### The terminal is a second line of defence
+
+For attendance specifically, the gap between nightly dumps matters less than it
+looks. The terminal keeps its own logs — tens of thousands of transactions — so
+after a restore you can use **Terminals → Send command → "Re-request attendance
+logs"** for the missing range and the device re-pushes them. Deduplication makes
+that safe to repeat.
+
+What the terminal cannot give back is everything else: manual corrections, new
+student records, staff account changes. That is the real exposure, and it is
+small enough to re-enter.
+
+---
+
+## 7. Post-deployment checklist
 
 - [ ] `GET /health` returns `{"status":"ok"}`
 - [ ] You can sign in and are forced to change the seeded password
@@ -181,12 +256,12 @@ day is closed, "absent" and "has not arrived yet" are the same thing.
 - [ ] `CORS_ORIGINS` is your Vercel domain, not `*`
 - [ ] `DEVICE_AUTO_REGISTER=false`
 - [ ] `DEVICE_PUSH_SECRET_REQUIRED=true`
-- [ ] Database backups confirmed on
+- [ ] Backups running — either Render's, or the scheduled script, and a restore rehearsed
 - [ ] A second administrator account exists, so one lost password is not a lockout
 
 ---
 
-## 7. Running it locally
+## 8. Running it locally
 
 ```bash
 # Database
@@ -219,7 +294,7 @@ constraint guaranteeing one record per student per day — lives in SQL.
 
 ---
 
-## 8. Costs
+## 9. Costs
 
 | Item | Estimate |
 |---|---|

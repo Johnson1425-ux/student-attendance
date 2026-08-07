@@ -77,6 +77,8 @@ frontend/         React (Vite) dashboard
 scripts/
   simulate-terminal.ps1     Terminal simulator (Windows PowerShell)
   simulate-terminal.sh      Terminal simulator (Linux / macOS)
+  backup-database.ps1/.sh   Verified nightly dump, with retention
+  restore-database.ps1/.sh  Restore, and the rehearsal you should do first
 
 docs/
   PRD.md                    The original requirements
