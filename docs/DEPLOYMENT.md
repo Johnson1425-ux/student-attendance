@@ -21,8 +21,10 @@ internet.
    cost) and the **External Database URL** (for running migrations from your
    laptop).
 
-Free-tier Render databases are deleted after 90 days. For a live school, use a
-paid instance — the PRD's $15–25/month covers this alongside the web service.
+**Free Render databases expire after 30 days**, with a 14-day grace period to
+upgrade before Render deletes them and everything in them. That is fine for a
+demonstration and disqualifying for a live school, so for real use take a paid
+instance — the PRD's $15–25/month covers it alongside the web service.
 
 **Back it up.** Render's paid tiers include daily backups; verify they are on.
 Attendance history is a legal record for many schools, and the whole point of
