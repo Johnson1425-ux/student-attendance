@@ -99,12 +99,156 @@ For a demo or training environment, `npm run seed:demo` additionally creates a
 sample school with 96 students, four classes, a terminal and six weeks of
 attendance. **Never run it against the live database.**
 
-### Free tier warning
+### Free tier walkthrough
 
-Render's free web services sleep after inactivity and take ~30 seconds to wake.
-A sleeping backend will refuse pushes from the terminal — the device retries, so
-data is not lost, but the dashboard goes stale and the nightly job may not run.
-Use a paid instance for anything real.
+The free tier is a good way to get this in front of the school before spending
+anything. Know what you are agreeing to first:
+
+| | Free tier behaviour |
+|---|---|
+| Database | **Expires after 30 days**, then 14 days' grace, then deleted with all data |
+| Database size | 1 GB |
+| Web service | Sleeps after 15 minutes idle; ~1 minute to wake |
+| Instance hours | 750 per workspace per month — enough for one always-on service |
+| Shell access | Paid plans only, so seeding is done from your own machine |
+
+A sleeping backend refuses the terminal's push. The device retries and nothing
+is lost, but the first scan of the morning may not appear for a minute, and the
+nightly finalisation job will not run if the service is asleep at the time. For
+a demonstration that is fine. For a live school it is not — and the 30-day
+database expiry settles the question anyway.
+
+#### 1. Create the database
+
+**New → Postgres.** Name it, pick the region nearest the school (Frankfurt is
+usually the lowest-latency option for East Africa), and choose the **Free**
+instance type.
+
+When it is ready, copy both connection strings from the dashboard:
+
+* **Internal Database URL** — for the web service. Same region, no egress cost.
+* **External Database URL** — for seeding and backups from your own machine.
+
+#### 2. Create the web service
+
+**New → Web Service**, connect this repository, and **select the branch you want
+to deploy** — Render defaults to the repository's default branch, which may not
+be the one holding this work.
+
+| Setting | Value |
+|---|---|
+| Root directory | `backend` |
+| Runtime | Node |
+| Build command | `npm ci` |
+| Start command | `npm start` |
+| Health check path | `/health` |
+| Instance type | Free |
+
+Environment variables:
+
+| Key | Value |
+|---|---|
+| `NODE_ENV` | `production` |
+| `DATABASE_URL` | the **Internal** Database URL |
+| `DATABASE_SSL` | `false` — see the note below |
+| `JWT_SECRET` | a long random string (command below) |
+| `CORS_ORIGINS` | `*` for now; tightened in step 5 |
+| `LOG_LEVEL` | `info` |
+| `ENABLE_SCHEDULER` | `true` |
+| `FINALIZE_CRON` | `30 23 * * *` |
+
+Generate the signing key with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+Do **not** set `PORT` — Render injects it, and the app reads it.
+
+On `DATABASE_SSL`: the internal URL is on Render's private network, so `false`
+is the right starting point. If the deploy logs show an SSL-related connection
+error, set it to `true` and redeploy.
+
+Migrations run automatically at start-up, so there is no separate release step.
+A healthy first deploy logs:
+
+```
+Database connection established
+Database already up to date
+Scheduler started
+Attendance API listening   port: 10000  env: production
+```
+
+#### 3. Seed the demo school from your machine
+
+Render's Shell is a paid feature, so seeding runs locally against the
+**External** Database URL. From `backend/`:
+
+```powershell
+$env:DATABASE_URL = "<external database url>"
+$env:DATABASE_SSL = "true"
+npm run seed:demo
+```
+
+```bash
+DATABASE_URL="<external database url>" DATABASE_SSL=true npm run seed:demo
+```
+
+External connections to Render Postgres require SSL, hence `true` here even
+though the service itself uses `false` internally.
+
+That creates 96 students, four classes, a terminal and six weeks of attendance,
+and prints the logins. Use `npm run seed` instead for an empty school with only
+an administrator — which is the right choice the moment real student data is
+involved.
+
+#### 4. Deploy the dashboard on Vercel
+
+**Add New → Project**, same repository, then:
+
+| Setting | Value |
+|---|---|
+| Root directory | `frontend` |
+| Framework preset | Vite |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+
+One environment variable — your Render URL, no trailing slash:
+
+```
+VITE_API_BASE_URL = https://your-service.onrender.com
+```
+
+Vite inlines this at build time, so changing it later needs a **redeploy**, not
+just a restart.
+
+#### 5. Close the loop on CORS
+
+Once Vercel gives you a URL, go back to the Render service and change
+`CORS_ORIGINS` from `*` to that exact origin, e.g.
+`https://student-attendance.vercel.app`. Render redeploys automatically.
+
+Leaving it as `*` lets any website call your API with a stolen token. It costs
+nothing to set properly.
+
+#### 6. Check it works
+
+Visit the Vercel URL and sign in. You will be held at the forced password
+change — that is intended. Then confirm:
+
+* the dashboard shows the demo school's figures;
+* **Terminals** lists the demo terminal as *never connected* (correct — it does
+  not exist);
+* a report exports as CSV.
+
+Then point the simulator at the deployed backend to prove the whole scan path
+works end to end:
+
+```powershell
+.\simulate-terminal.ps1 -BaseUrl 'https://your-service.onrender.com' -Password 'your-password'
+```
+
+The first request may take a minute while the free service wakes up.
 
 ---
 
