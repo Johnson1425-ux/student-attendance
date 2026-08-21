@@ -28,13 +28,34 @@ async function ensureMigrationsTable() {
   `);
 }
 
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+
+/**
+ * Checksums for one migration file.
+ *
+ * The canonical checksum is taken over LF-normalised text, because the same
+ * committed file arrives with different bytes depending on the platform that
+ * checked it out — Git on Windows hands out CRLF by default. Hashing the raw
+ * bytes made a Linux-applied migration look "modified" when re-read on Windows,
+ * which is a false alarm about the one thing this check exists to catch.
+ *
+ * `accepted` also carries the raw and CRLF hashes so databases stamped by the
+ * older, byte-sensitive runner are recognised rather than rejected.
+ */
+function checksumsFor(sql) {
+  const lf = sql.replace(/\r\n/g, '\n');
+  const crlf = lf.replace(/\n/g, '\r\n');
+  const checksum = sha256(lf);
+  return { checksum, accepted: new Set([checksum, sha256(sql), sha256(crlf)]) };
+}
+
 async function loadMigrationFiles() {
   const entries = await readdir(MIGRATIONS_DIR);
   const files = entries.filter((f) => f.endsWith('.sql')).sort();
   return Promise.all(
     files.map(async (filename) => {
       const sql = await readFile(join(MIGRATIONS_DIR, filename), 'utf8');
-      return { filename, sql, checksum: createHash('sha256').update(sql).digest('hex') };
+      return { filename, sql, ...checksumsFor(sql) };
     }),
   );
 }
@@ -50,14 +71,23 @@ export async function runMigrations({ silent = false } = {}) {
   const applied = await appliedMigrations();
   const executed = [];
 
-  for (const { filename, sql, checksum } of files) {
+  for (const { filename, sql, checksum, accepted } of files) {
     const previous = applied.get(filename);
     if (previous) {
-      if (previous !== checksum) {
+      if (!accepted.has(previous)) {
         throw new Error(
           `Migration ${filename} was modified after it was applied. ` +
             'Create a new migration instead of editing an applied one.',
         );
+      }
+      if (previous !== checksum) {
+        // Same file, stamped by the byte-sensitive runner. Restamp it so the
+        // healing only ever happens once.
+        await pool.query('UPDATE schema_migrations SET checksum = $1 WHERE filename = $2', [
+          checksum,
+          filename,
+        ]);
+        if (!silent) logger.info({ filename }, 'Normalised a stored migration checksum');
       }
       continue;
     }

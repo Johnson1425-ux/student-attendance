@@ -83,6 +83,13 @@ cd backend
 DATABASE_URL="<external database url>" DATABASE_SSL=true npm run migrate
 ```
 
+The runner checksums each migration file and refuses to continue if one was
+edited after it was applied, since silent schema drift between environments is
+far more expensive than a loud failure. Checksums are taken over LF-normalised
+text, so the same committed file matches whether it was checked out on Linux or
+on Windows. A database stamped by an older build is recognised and quietly
+restamped.
+
 ### First-run seed
 
 Once, to create the first administrator:

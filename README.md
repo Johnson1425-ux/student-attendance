@@ -66,7 +66,7 @@ backend/          Node.js + Express API
     lib/adms/     Terminal wire-protocol codec (no I/O, directly testable)
     db/           Schema migrations, connection pool, seeding
     jobs/         Nightly finalisation and housekeeping
-  tests/          191 unit and integration tests, run against real PostgreSQL
+  tests/          194 unit and integration tests, run against real PostgreSQL
 
 frontend/         React (Vite) dashboard
   src/
@@ -144,13 +144,13 @@ createdb attendance_test
 cd backend && npm test
 ```
 
-191 tests. Unit tests cover the ADMS codec against real captured payloads,
+194 tests. Unit tests cover the ADMS codec against real captured payloads,
 timezone handling across the UTC boundary, temporary-password generation, and
 CSV escaping. Integration tests
 run against a real PostgreSQL database and cover the attendance engine
 (deduplication, late classification, override precedence, day finalisation),
-absence-streak arithmetic, report totals, and the HTTP surface including
-role-based access.
+absence-streak arithmetic, report totals, migration checksums across mixed
+line-ending checkouts, and the HTTP surface including role-based access.
 
 ---
 

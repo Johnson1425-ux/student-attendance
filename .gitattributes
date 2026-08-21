@@ -1,0 +1,24 @@
+# Normalise line endings in the repository, and control what gets checked out.
+#
+# Without this, Git for Windows checks files out with CRLF by default. That is
+# harmless for most of the tree, but not for these two kinds of file:
+#
+#   *.sql  the migration runner checksums file contents, so CRLF made a
+#          Linux-applied migration look edited when re-read on Windows
+#   *.sh   a shell script with CRLF fails with "bad interpreter: /usr/bin/env
+#          bash^M", which is a confusing way to learn about line endings
+
+* text=auto
+
+*.sql   text eol=lf
+*.sh    text eol=lf
+
+# PowerShell is happy either way; CRLF keeps Notepad and older editors happy too.
+*.ps1   text eol=crlf
+
+# Never touched by normalisation.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.pdf   binary
+*.ico   binary
