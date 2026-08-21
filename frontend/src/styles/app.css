@@ -202,10 +202,18 @@ a:hover {
 
 /* --- Layout ------------------------------------------------------------ */
 
+/* On phones, `100vh` is the viewport as it would be with the browser's address
+   bar and toolbar retracted — taller than what you can actually see. Anything
+   sized to it puts its last few pixels underneath the browser buttons, where
+   they cannot be tapped. `100dvh` tracks the visible area as that chrome slides
+   in and out. The `vh` line stays first as a fallback for browsers predating
+   `dvh` (Safari < 15.4, Chrome < 108). */
+
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .sidebar {
@@ -216,7 +224,9 @@ a:hover {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sidebar__brand {
@@ -900,7 +910,7 @@ a:hover {
 
 .toast-stack {
   position: fixed;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   right: 20px;
   z-index: 200;
   display: flex;
@@ -948,6 +958,7 @@ a:hover {
   display: grid;
   place-items: center;
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   z-index: 100;
   animation: fade-in 0.12s ease-out;
 }
@@ -965,6 +976,7 @@ a:hover {
   width: 100%;
   max-width: 620px;
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   display: flex;
   flex-direction: column;
 }
@@ -1006,6 +1018,7 @@ a:hover {
 
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 20px;
@@ -1218,12 +1231,19 @@ a:hover {
     position: fixed;
     left: 0;
     top: 0;
-    bottom: 0;
+    /* Deliberately no `bottom` and no `height: auto`. A fixed element resolves
+       `bottom` against the layout viewport, which on a phone is the *large*
+       viewport — so `bottom: 0` does not stop at the browser toolbar, and with
+       `height: auto` the drawer grows to fit its nav instead of scrolling,
+       putting "Sign out" below the fold with no way to reach it. The inherited
+       `height: 100dvh` keeps it the size of the visible area, which is what
+       makes `overflow-y: auto` engage. */
     width: var(--sidebar-width);
     z-index: 60;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-lg);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .sidebar.is-open {
@@ -1242,7 +1262,10 @@ a:hover {
   }
 
   .page {
-    padding: 14px;
+    /* The browser's bottom toolbar overlays the end of the document, and there
+       is nothing left to scroll once you reach it. Without this the last table
+       row or the pagination controls sit underneath it. */
+    padding: 14px 14px calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
   .topbar {
