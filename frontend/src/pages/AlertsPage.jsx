@@ -71,16 +71,17 @@ export default function AlertsPage() {
             </select>
           </Field>
           {permissions.canEditAttendance && (
-            <button
-              type="button"
-              className="btn btn--sm"
-              style={{ marginLeft: 'auto' }}
-              onClick={() => refreshMutation.mutate()}
-              disabled={refreshMutation.isPending}
-              title="Recalculate every student's absence streak against the current threshold"
-            >
-              {refreshMutation.isPending ? 'Recalculating…' : 'Recalculate'}
-            </button>
+            <div className="filter-bar__actions">
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+                title="Recalculate every student's absence streak against the current threshold"
+              >
+                {refreshMutation.isPending ? 'Recalculating…' : 'Recalculate'}
+              </button>
+            </div>
           )}
         </div>
       </Card>

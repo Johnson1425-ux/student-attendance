@@ -647,6 +647,30 @@ a:hover {
   min-width: 150px;
 }
 
+/* A date or time field needs more than the 150px above: Safari — on iPhone and
+   iPad alike — renders these controls at an intrinsic width it will not shrink
+   below, and paints over whatever is beside them rather than clipping. 150px
+   was not enough, and this applies at desktop widths too, where an iPad in
+   landscape gets the two-column layout. Browsers without `:has()` fall back to
+   the 150px above, which is what they render today. */
+.filter-bar .field:has(.input[type='date']),
+.filter-bar .field:has(.input[type='time']) {
+  min-width: 190px;
+}
+
+/* The buttons that belong to a filter bar — Refresh, Export, Add days. They sit
+   at the far end of the row on a wide screen, and take a row of their own on a
+   narrow one (see the responsive section) so they never share a line with a
+   date field. Safari renders `input[type="date"]` wider than the box it is
+   given, and a button beside one gets painted over. */
+.filter-bar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .checkbox {
   display: flex;
   align-items: center;
@@ -1306,6 +1330,14 @@ a:hover {
      whatever that minimum turns out to be, rather than us guessing at it. */
   .filter-bar .field {
     flex: 1 1 200px;
+  }
+
+  /* `flex-basis: 100%` puts these on a line of their own, so the field above
+     them keeps the full width of the bar. */
+  .filter-bar__actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
   }
 
   .topbar {

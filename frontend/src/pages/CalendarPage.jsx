@@ -75,14 +75,15 @@ export default function CalendarPage() {
           <Field label="To">
             <input className="input" type="date" value={range.to} onChange={(e) => setRange({ ...range, to: e.target.value })} />
           </Field>
-          <button
-            type="button"
-            className="btn btn--primary btn--sm"
-            style={{ marginLeft: 'auto' }}
-            onClick={() => setAdding({ date: isoToday(), endDate: '', dayType: 'holiday', label: '' })}
-          >
-            Add days
-          </button>
+          <div className="filter-bar__actions">
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={() => setAdding({ date: isoToday(), endDate: '', dayType: 'holiday', label: '' })}
+            >
+              Add days
+            </button>
+          </div>
         </div>
       </Card>
 

@@ -72,7 +72,7 @@ export default function StudentDetailPage() {
                   onChange={(e) => setRange({ ...range, to: e.target.value })}
                 />
               </Field>
-              <div className="btn-group" style={{ marginLeft: 'auto' }}>
+              <div className="btn-group filter-bar__actions">
                 <button
                   type="button"
                   className="btn btn--sm"

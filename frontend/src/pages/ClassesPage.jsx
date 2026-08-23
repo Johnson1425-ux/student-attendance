@@ -65,16 +65,17 @@ export default function ClassesPage() {
             Show inactive classes
           </label>
           {permissions.canManageClasses && (
-            <button
-              type="button"
-              className="btn btn--primary btn--sm"
-              style={{ marginLeft: 'auto' }}
-              onClick={() =>
-                setEditing({ name: '', gradeLevel: '', stream: '', academicYear: currentYear, room: '', teacherIds: [] })
-              }
-            >
-              Add class
-            </button>
+            <div className="filter-bar__actions">
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() =>
+                  setEditing({ name: '', gradeLevel: '', stream: '', academicYear: currentYear, room: '', teacherIds: [] })
+                }
+              >
+                Add class
+              </button>
+            </div>
           )}
         </div>
       </Card>

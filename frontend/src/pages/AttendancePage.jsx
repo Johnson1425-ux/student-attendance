@@ -193,7 +193,7 @@ export default function AttendancePage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </Field>
-          <div className="row" style={{ marginLeft: 'auto', gap: 8 }}>
+          <div className="filter-bar__actions">
             <button type="button" className="btn btn--sm" onClick={() => refetch()} disabled={isFetching}>
               {isFetching ? 'Refreshing…' : 'Refresh'}
             </button>
