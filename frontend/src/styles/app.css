@@ -597,6 +597,8 @@ a:hover {
 .select,
 .textarea {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -1294,6 +1296,16 @@ a:hover {
        is nothing left to scroll once you reach it. Without this the last table
        row or the pagination controls sit underneath it. */
     padding: 14px 14px calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Filter fields grow to fill the row, and wrap to one per row as soon as two
+     will not fit. Safari renders `input[type="date"]` at an intrinsic width it
+     refuses to shrink below — wider than the 150px slot two of them were being
+     given — so the two date controls painted over each other. Letting a field
+     have the whole row means the control has more room than its minimum
+     whatever that minimum turns out to be, rather than us guessing at it. */
+  .filter-bar .field {
+    flex: 1 1 200px;
   }
 
   .topbar {
