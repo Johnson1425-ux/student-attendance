@@ -977,6 +977,12 @@ a:hover {
   max-width: 620px;
   max-height: calc(100vh - 48px);
   max-height: calc(100dvh - 48px);
+  /* Without this the dialog grows straight past `max-width`. As a grid item its
+     automatic minimum width is that of its content, so a single unbreakable
+     line — a JSON timestamp in the activity log, a device serial — drags the
+     whole dialog off the side of a phone screen, and `overflow-x` on the inner
+     block never gets a chance to act. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -999,11 +1005,29 @@ a:hover {
 .modal__title {
   font-size: 15px;
   font-weight: 650;
+  /* Titles are data — an action name, a student's name. Let a long one wrap
+     rather than push the close button off the edge. */
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .modal__body {
   padding: 18px;
   overflow-y: auto;
+  min-width: 0;
+}
+
+/* Preformatted data — the before/after JSON in the activity log. Wide by
+   nature, so it scrolls sideways within the dialog instead of widening it. */
+.code-block {
+  background: var(--surface-2);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .modal__footer {
@@ -1217,8 +1241,12 @@ a:hover {
 /* --- Responsive -------------------------------------------------------- */
 
 @media (max-width: 1080px) {
+  /* `minmax(0, 1fr)`, not `1fr`: a bare `1fr` is `minmax(auto, 1fr)`, and that
+     automatic minimum is the content's own minimum width. One wide child — the
+     chart's SVG, a table of dates that will not wrap — then holds the column
+     open and the whole page scrolls sideways. */
   .grid-main-side {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1270,6 +1298,27 @@ a:hover {
 
   .topbar {
     padding: 8px 14px;
+  }
+
+  /* Give dialogs the width back. 20px of backdrop on each side is a fifth of a
+     phone screen. */
+  .modal-backdrop {
+    padding: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  /* Sideways scrolling inside a dialog on a phone is close to undiscoverable,
+     so wrap the JSON instead. Long tokens break mid-string rather than forcing
+     a scrollbar nobody finds. */
+  .code-block {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 11.5px;
   }
 
   .topbar__title {

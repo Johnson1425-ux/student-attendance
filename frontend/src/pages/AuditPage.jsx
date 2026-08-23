@@ -129,7 +129,7 @@ export default function AuditPage() {
             {inspecting.before_data && (
               <div>
                 <p className="field__label">Before</p>
-                <pre className="mono" style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 8, overflowX: 'auto' }}>
+                <pre className="mono code-block">
                   {JSON.stringify(inspecting.before_data, null, 2)}
                 </pre>
               </div>
@@ -137,7 +137,7 @@ export default function AuditPage() {
             {inspecting.after_data && (
               <div>
                 <p className="field__label">After</p>
-                <pre className="mono" style={{ background: 'var(--surface-2)', padding: 12, borderRadius: 8, overflowX: 'auto' }}>
+                <pre className="mono code-block">
                   {JSON.stringify(inspecting.after_data, null, 2)}
                 </pre>
               </div>
