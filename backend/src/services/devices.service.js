@@ -244,8 +244,11 @@ export async function authenticateDevice({ serialNumber, secret, ip }) {
       logger.warn({ serialNumber, ip }, 'Push rejected: bad device secret');
       throw new ForbiddenError('Invalid device credentials');
     }
-  } else if (env.DEVICE_PUSH_SECRET_REQUIRED) {
-    throw new ForbiddenError('This terminal has no push secret configured');
+  } else if (env.DEVICE_PUSH_SECRET_REQUIRED && !device.ip_allowlist?.length) {
+    // Some firmware cannot put a secret in its URL; an IP allowlist is the
+    // accepted alternative. A terminal with neither is open to anyone who
+    // reads the serial number off its case.
+    throw new ForbiddenError('This terminal has no push secret or IP allowlist configured');
   }
 
   if (device.ip_allowlist?.length && ip && !device.ip_allowlist.includes(ip)) {

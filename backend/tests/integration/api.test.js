@@ -12,6 +12,7 @@ import {
   query,
 } from '../helpers/db.js';
 import { todayInZone } from '../../src/lib/dates.js';
+import { env } from '../../src/config/env.js';
 
 const app = createApp();
 const TODAY = todayInZone('Africa/Dar_es_Salaam');
@@ -635,6 +636,20 @@ describe('API', () => {
       expect((await request(app).get('/iclock/cdata?SN=SN00004&options=all')).status).toBe(403);
       expect((await request(app).get('/iclock/cdata?SN=SN00004&options=all&key=wrong')).status).toBe(403);
       expect((await request(app).get('/iclock/cdata?SN=SN00004&options=all&key=topsecret')).status).toBe(200);
+    });
+
+    it('refuses a terminal with neither a secret nor an allowlist when secrets are required', async () => {
+      await createDevice({ serialNumber: 'SN00006' });
+      await createDevice({ serialNumber: 'SN00007' });
+      await query("UPDATE devices SET ip_allowlist = ARRAY['127.0.0.1', '::ffff:127.0.0.1'] WHERE serial_number = 'SN00007'");
+
+      env.DEVICE_PUSH_SECRET_REQUIRED = true;
+      try {
+        expect((await request(app).get('/iclock/cdata?SN=SN00006&options=all')).status).toBe(403);
+        expect((await request(app).get('/iclock/cdata?SN=SN00007&options=all')).status).toBe(200);
+      } finally {
+        env.DEVICE_PUSH_SECRET_REQUIRED = false;
+      }
     });
 
     it('accepts an attendance push and answers OK with the batch size', async () => {

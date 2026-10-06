@@ -56,7 +56,7 @@ this system is to stop keeping it on paper.
 | `LOG_LEVEL` | `info` |
 | `ENABLE_SCHEDULER` | `true` |
 | `FINALIZE_CRON` | `30 23 * * *` (UTC — see §5) |
-| `DEVICE_PUSH_SECRET_REQUIRED` | `true` once the terminals are configured |
+| `DEVICE_PUSH_SECRET_REQUIRED` | leave unset (defaults to `true` in production); `false` only while installing a terminal |
 | `DEVICE_AUTO_REGISTER` | `false` (temporarily `true` during installation) |
 | `SEED_ADMIN_EMAIL` | the head teacher's or IT contact's email |
 | `SEED_ADMIN_PASSWORD` | a strong temporary password |
@@ -408,7 +408,7 @@ small enough to re-enter.
 - [ ] A CSV and a PDF export both download correctly
 - [ ] `CORS_ORIGINS` is your Vercel domain, not `*`
 - [ ] `DEVICE_AUTO_REGISTER=false`
-- [ ] `DEVICE_PUSH_SECRET_REQUIRED=true`
+- [ ] `DEVICE_PUSH_SECRET_REQUIRED` is unset or `true`, and every terminal has a push secret or an IP allowlist
 - [ ] Backups running — either Render's, or the scheduled script, and a restore rehearsed
 - [ ] A second administrator account exists, so one lost password is not a lockout
 

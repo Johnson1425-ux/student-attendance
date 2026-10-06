@@ -28,11 +28,12 @@ const schema = z.object({
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 
-  // ADMS ingestion
+  // ADMS ingestion. Unset means "required in production, optional elsewhere",
+  // so a production deploy is locked down unless someone opts out on purpose.
   DEVICE_PUSH_SECRET_REQUIRED: z
     .enum(['true', 'false'])
-    .default('false')
-    .transform((v) => v === 'true'),
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
   DEVICE_AUTO_REGISTER: z
     .enum(['true', 'false'])
     .default('false')
@@ -61,6 +62,7 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+env.DEVICE_PUSH_SECRET_REQUIRED ??= env.NODE_ENV === 'production';
 
 export const isProduction = env.NODE_ENV === 'production';
 export const isTest = env.NODE_ENV === 'test';

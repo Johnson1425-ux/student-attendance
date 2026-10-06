@@ -14,6 +14,7 @@ import { ingestPunches } from '../services/attendance.service.js';
 import { getAttendanceConfig } from '../services/settings.service.js';
 import { logger } from '../config/logger.js';
 import { AppError } from '../lib/errors.js';
+import { redactQuerySecrets } from '../lib/redact.js';
 
 /**
  * Terminal-facing ADMS endpoints.
@@ -47,7 +48,7 @@ router.use(
 /** Log every device interaction at debug level — invaluable during install. */
 router.use((req, _res, next) => {
   logger.debug(
-    { path: req.path, query: req.query, bytes: typeof req.body === 'string' ? req.body.length : 0 },
+    { path: req.path, query: redactQuerySecrets(req.query), bytes: typeof req.body === 'string' ? req.body.length : 0 },
     'ADMS request',
   );
   next();
