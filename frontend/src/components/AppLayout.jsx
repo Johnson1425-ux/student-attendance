@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { initials } from '../utils/format.js';
 import ChangePasswordModal from './ChangePasswordModal.jsx';
+import { Loading } from './ui.jsx';
 
 /**
  * Application shell: sidebar navigation, header, and the routed page body.
@@ -195,7 +196,9 @@ export default function AppLayout() {
         </header>
 
         <main className="page">
-          <Outlet context={{ settings }} />
+          <Suspense fallback={<Loading />}>
+            <Outlet context={{ settings }} />
+          </Suspense>
         </main>
       </div>
 

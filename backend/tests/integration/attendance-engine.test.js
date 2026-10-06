@@ -116,6 +116,40 @@ describe('attendance engine', () => {
       expect(rows[0].count).toBe(2);
     });
 
+    it('counts a scan repeated inside one batch once', async () => {
+      await createStudent({ pin: '1001', classId: klass.id });
+
+      const summary = await ingestPunches({
+        device,
+        records: [punch('1001', '07:12:44'), punch('1001', '07:12:44')],
+      });
+
+      expect(summary).toMatchObject({ received: 2, stored: 1, duplicates: 1 });
+    });
+
+    it('stores a backlog larger than one insert chunk', async () => {
+      const students = await Promise.all(
+        Array.from({ length: 3 }, (_, i) => createStudent({ pin: String(2000 + i), classId: klass.id })),
+      );
+      // 3 students x 400 scans a second apart = 1,200 scans, spanning three chunks.
+      const records = [];
+      for (const student of students) {
+        for (let s = 0; s < 400; s += 1) {
+          const t = 7 * 3600 + s;
+          const hh = String(Math.floor(t / 3600)).padStart(2, '0');
+          const mm = String(Math.floor((t % 3600) / 60)).padStart(2, '0');
+          const ss = String(t % 60).padStart(2, '0');
+          records.push(punch(student.device_user_pin, `${hh}:${mm}:${ss}`));
+        }
+      }
+
+      const summary = await ingestPunches({ device, records });
+
+      expect(summary).toMatchObject({ received: 1200, stored: 1200, duplicates: 0, applied: 3 });
+      const { rows } = await query('SELECT COUNT(*)::int AS count FROM attendance_records');
+      expect(rows[0].count).toBe(3);
+    });
+
     it('takes the earliest punch as check-in even when they arrive out of order', async () => {
       const student = await createStudent({ pin: '1001', classId: klass.id });
 

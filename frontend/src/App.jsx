@@ -1,22 +1,27 @@
+import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import { Loading } from './components/ui.jsx';
 
 import LoginPage from './pages/LoginPage.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
-import AttendancePage from './pages/AttendancePage.jsx';
-import StudentsPage from './pages/StudentsPage.jsx';
-import StudentDetailPage from './pages/StudentDetailPage.jsx';
-import ClassesPage from './pages/ClassesPage.jsx';
-import ReportsPage from './pages/ReportsPage.jsx';
-import AlertsPage from './pages/AlertsPage.jsx';
-import DevicesPage from './pages/DevicesPage.jsx';
-import CalendarPage from './pages/CalendarPage.jsx';
-import UsersPage from './pages/UsersPage.jsx';
-import SettingsPage from './pages/SettingsPage.jsx';
-import AuditPage from './pages/AuditPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
+
+// Every signed-in screen is its own chunk, fetched the first time it is
+// opened. The charts library in particular is only downloaded by the two
+// screens that draw charts, not by the login page.
+const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
+const AttendancePage = lazy(() => import('./pages/AttendancePage.jsx'));
+const StudentsPage = lazy(() => import('./pages/StudentsPage.jsx'));
+const StudentDetailPage = lazy(() => import('./pages/StudentDetailPage.jsx'));
+const ClassesPage = lazy(() => import('./pages/ClassesPage.jsx'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage.jsx'));
+const AlertsPage = lazy(() => import('./pages/AlertsPage.jsx'));
+const DevicesPage = lazy(() => import('./pages/DevicesPage.jsx'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage.jsx'));
+const UsersPage = lazy(() => import('./pages/UsersPage.jsx'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
+const AuditPage = lazy(() => import('./pages/AuditPage.jsx'));
 
 /**
  * Route guard. Screens listed under a permission are unreachable by URL as well

@@ -66,7 +66,7 @@ backend/          Node.js + Express API
     lib/adms/     Terminal wire-protocol codec (no I/O, directly testable)
     db/           Schema migrations, connection pool, seeding
     jobs/         Nightly finalisation and housekeeping
-  tests/          194 unit and integration tests, run against real PostgreSQL
+  tests/          Unit and integration tests, run against real PostgreSQL
 
 frontend/         React (Vite) dashboard
   src/
@@ -141,10 +141,14 @@ acknowledged and stored nowhere.
 
 ```bash
 createdb attendance_test
-cd backend && npm test
+cd backend && npm run lint && npm test
+cd frontend && npm run lint && npm test
 ```
 
-194 tests. Unit tests cover the ADMS codec against real captured payloads,
+GitHub Actions runs the same commands, plus the frontend build, on every pull
+request (`.github/workflows/ci.yml`).
+
+The backend has 201 tests. Unit tests cover the ADMS codec against real captured payloads,
 timezone handling across the UTC boundary, temporary-password generation, and
 CSV escaping. Integration tests
 run against a real PostgreSQL database and cover the attendance engine
