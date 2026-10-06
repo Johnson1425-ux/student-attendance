@@ -90,6 +90,7 @@ export async function ingestPunches({ device, records }) {
   const studentByPin = new Map(studentRows.map((r) => [r.device_user_pin, r]));
 
   const touched = new Map(); // `${studentId}:${date}` → { studentId, date }
+  const rows = [];
 
   for (const record of records) {
     const eventTime = parseDeviceTimestamp(record.timestamp, config.timezone);
@@ -102,47 +103,40 @@ export async function ingestPunches({ device, records }) {
     const student = studentByPin.get(record.pin) ?? null;
     if (!student) summary.unmatched += 1;
 
-    const localDate = toLocalDate(eventTime, config.timezone);
-    const localTime = toLocalTime(eventTime, config.timezone);
-    const dedupeHash = eventDedupeHash({
-      serialNumber: device.serial_number,
-      pin: record.pin,
-      timestamp: record.timestamp,
-      punchState: record.punchState,
+    rows.push({
+      record,
+      student,
+      eventTime,
+      localDate: toLocalDate(eventTime, config.timezone),
+      localTime: toLocalTime(eventTime, config.timezone),
+      dedupeHash: eventDedupeHash({
+        serialNumber: device.serial_number,
+        pin: record.pin,
+        timestamp: record.timestamp,
+        punchState: record.punchState,
+      }),
     });
+  }
 
-    const { rows } = await query(
-      `INSERT INTO attendance_events
-         (device_id, device_serial, device_user_pin, student_id, event_time, local_date, local_time,
-          punch_state, verify_mode, work_code, raw_line, dedupe_hash)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       ON CONFLICT (dedupe_hash) DO NOTHING
-       RETURNING id`,
-      [
-        device.id,
-        device.serial_number,
-        record.pin,
-        student?.id ?? null,
-        eventTime,
-        localDate,
-        localTime,
-        record.punchState,
-        record.verifyMode,
-        record.workCode,
-        record.raw?.slice(0, 500) ?? null,
-        dedupeHash,
-      ],
-    );
+  // A terminal coming back from an outage can upload thousands of scans in one
+  // push, so they are written a chunk at a time rather than one query each.
+  for (let i = 0; i < rows.length; i += INGEST_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + INGEST_CHUNK_SIZE);
+    const inserted = await insertEventChunk(device, chunk);
 
-    if (rows.length === 0) {
-      summary.duplicates += 1;
-      continue;
-    }
-    summary.stored += 1;
+    for (const row of chunk) {
+      // A hash can appear twice in one batch; only its first occurrence counts
+      // as stored.
+      if (!inserted.delete(row.dedupeHash)) {
+        summary.duplicates += 1;
+        continue;
+      }
+      summary.stored += 1;
 
-    // Only students who exist and are still on roll affect the daily register.
-    if (student && student.status === 'active') {
-      touched.set(`${student.id}:${localDate}`, { studentId: student.id, date: localDate });
+      // Only students who exist and are still on roll affect the daily register.
+      if (row.student && row.student.status === 'active') {
+        touched.set(`${row.student.id}:${row.localDate}`, { studentId: row.student.id, date: row.localDate });
+      }
     }
   }
 
@@ -153,6 +147,41 @@ export async function ingestPunches({ device, records }) {
 
   await query('UPDATE devices SET last_push_at = now(), last_seen_at = now() WHERE id = $1', [device.id]);
   return summary;
+}
+
+const INGEST_CHUNK_SIZE = 500;
+
+/**
+ * Insert one chunk of punches into the ledger, skipping any already stored.
+ * Returns the set of dedupe hashes that were newly written.
+ */
+async function insertEventChunk(device, chunk) {
+  const { rows } = await query(
+    `INSERT INTO attendance_events
+       (device_id, device_serial, device_user_pin, student_id, event_time, local_date, local_time,
+        punch_state, verify_mode, work_code, raw_line, dedupe_hash)
+     SELECT $1, $2, t.*
+       FROM unnest($3::text[], $4::bigint[], $5::timestamptz[], $6::date[], $7::time[],
+                   $8::smallint[], $9::smallint[], $10::text[], $11::text[], $12::text[])
+            AS t(pin, student_id, event_time, local_date, local_time, punch_state, verify_mode, work_code, raw_line, dedupe_hash)
+     ON CONFLICT (dedupe_hash) DO NOTHING
+     RETURNING dedupe_hash`,
+    [
+      device.id,
+      device.serial_number,
+      chunk.map((r) => r.record.pin),
+      chunk.map((r) => r.student?.id ?? null),
+      chunk.map((r) => r.eventTime.toISOString()),
+      chunk.map((r) => r.localDate),
+      chunk.map((r) => r.localTime),
+      chunk.map((r) => r.record.punchState),
+      chunk.map((r) => r.record.verifyMode),
+      chunk.map((r) => r.record.workCode),
+      chunk.map((r) => r.record.raw?.slice(0, 500) ?? null),
+      chunk.map((r) => r.dedupeHash),
+    ],
+  );
+  return new Set(rows.map((r) => r.dedupe_hash));
 }
 
 /**
