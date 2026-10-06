@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { logger } from './config/logger.js';
 import { corsOrigins, isTest, env } from './config/env.js';
 import { pool } from './db/pool.js';
+import { redactUrlSecrets, redactQuerySecrets } from './lib/redact.js';
 
 /**
  * Express application factory. Kept separate from the server bootstrap so tests
@@ -39,6 +40,15 @@ export function createApp() {
       logger,
       genReqId: (req) => req.headers['x-request-id'] ?? randomUUID(),
       autoLogging: { ignore: (req) => req.url === '/health' },
+      // Terminals send their push secret in the query string; keep it out of
+      // the request log.
+      serializers: {
+        req: (req) => {
+          req.url = redactUrlSecrets(req.url);
+          req.query = redactQuerySecrets(req.query);
+          return req;
+        },
+      },
       customLogLevel: (_req, res, err) => {
         if (err || res.statusCode >= 500) return 'error';
         if (res.statusCode >= 400) return 'warn';

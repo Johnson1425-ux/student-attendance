@@ -135,9 +135,9 @@ Some firmware has a separate **URL path** or **Web Address** field. Set it to:
 ```
 
 If there is no path field, the device will use `/iclock/` and you must instead
-add the source IP to the device's allowlist in the dashboard, or leave the push
-secret unset for that device. Setting `DEVICE_PUSH_SECRET_REQUIRED=true` in the
-backend environment refuses any device without a secret.
+add the source IP to the device's allowlist in the dashboard. In production the
+backend refuses any terminal that has neither a push secret nor an IP allowlist
+(`DEVICE_PUSH_SECRET_REQUIRED`, which defaults to `true` there).
 
 Then set the device clock and timezone: **Menu → System → Date/Time**. The device
 sends wall-clock time with no timezone offset, so a wrong device clock produces
